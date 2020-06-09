@@ -74,4 +74,7 @@ e32_cmd_write_settings(struct E32 *dev);
 int
 e32_transmit(struct E32 *dev, uint8_t *buf, uint8_t buf_len);
 
+int
+e32_receive(struct E32 *dev, uint8_t *buf, uint8_t buf_len);
+
 #endif

@@ -123,6 +123,9 @@ main(int argc, char *argv[])
   lsm9ds1_ag_poll(&dev, &opts);
 
 */
+  uint8_t buf[58];
+  e32_receive(&dev, buf, 58);
+  for(int i=0; i<58; i++) printf("%d ", buf[i]);
 cleanup:
   ret |= e32_deinit(&opts, &dev);
 

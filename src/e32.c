@@ -106,9 +106,8 @@ e32_aux_poll(struct E32 *dev)
 
   lseek(fd, 0, SEEK_SET);
   read(fd, buf, sizeof(buf));
-  // TODO WTH??
-  printf("here\n");
-  close(fd);
+
+  usleep(10000);
 
   return 0;
 }
@@ -309,7 +308,7 @@ e32_cmd_read_settings(struct E32 *dev)
   }
 
   dev->fec = buf[5] & 0b00000100;
-  dev->fec >>= 1;
+  dev->fec >>= 2;
 
   dev->tx_power_dbm = buf[5] & 0b00000011;
   switch(dev->tx_power_dbm)
@@ -419,4 +418,13 @@ e32_transmit(struct E32 *dev, uint8_t *buf, uint8_t buf_len)
     return 1;
 
   return e32_aux_poll(dev);
+}
+
+int
+e32_receive(struct E32 *dev, uint8_t *buf, uint8_t buf_len)
+{
+  int bytes;
+  bytes = read(dev->uart_fd, buf, buf_len);
+  if(bytes != buf_len)
+    return -1;
 }
