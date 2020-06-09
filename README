@@ -1,0 +1,9 @@
+wget http://lloydrochester.com/code/ebyte-sx1276-1.0.tar.gz
+tar zxf ebyte-sx1276-1.0.tar.gz
+cd ebyte-sx1276
+./configure
+make
+./src/ebyte-sx1276
+
+https://www.raspberrypi.org/documentation/configuration/uart.md
+dialout group
