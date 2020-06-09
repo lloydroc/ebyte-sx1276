@@ -84,6 +84,13 @@ e32_aux_poll(struct E32 *dev)
   int ret;
   char buf[2];
 
+  ret = gpio_read(dev->gpio_aux_fd, buf) != 2;
+  if(ret == 0 && buf[0] == 1)
+  {
+    fprintf(stderr, "AUX is already high\n");
+    return 1;
+  }
+
   // we will wait 100ms+10ms buffer
   timeout = 110;
 
@@ -348,19 +355,19 @@ e32_print_settings(struct E32 *dev)
   switch(dev->parity)
   {
   case 0:
-    printf("Parity:                   8N1\n"); 
+    printf("Parity:                   8N1\n");
     break;
   case 1:
-    printf("Parity:                   8O1\n"); 
+    printf("Parity:                   8O1\n");
     break;
   case 2:
-    printf("Parity:                   8E1\n"); 
+    printf("Parity:                   8E1\n");
     break;
   case 3:
-    printf("Parity:                   8N1\n"); 
+    printf("Parity:                   8N1\n");
     break;
   default:
-    printf("Parity:                   Unknown\n"); 
+    printf("Parity:                   Unknown\n");
     break;
   }
 
@@ -480,6 +487,5 @@ e32_receive(struct E32 *dev, uint8_t *buf, uint8_t buf_len)
 {
   int bytes;
   bytes = read(dev->uart_fd, buf, buf_len);
-  if(bytes != buf_len)
-    return -1;
+  return bytes != buf_len;
 }

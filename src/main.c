@@ -50,12 +50,16 @@ main(int argc, char *argv[])
     goto cleanup;
 
   if(opts.mode != -1)
+  {
     ret |= e32_set_mode(&dev, opts.mode);
+    goto cleanup;
+  }
 
   if(opts.test)
   {
-    uint8_t buf[22];
-    e32_transmit(&dev, buf, 22);
+    uint8_t buf[58];
+    for(int i=0; i<58; i++) buf[i] = i;
+    e32_transmit(&dev, buf, 58);
     goto cleanup;
   }
   if(opts.reset)
