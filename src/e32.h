@@ -56,6 +56,9 @@ e32_get_mode(struct E32 *dev);
 int
 e32_cmd_read_settings(struct E32 *dev);
 
+void
+e32_print_settings(struct E32 *dev);
+
 int
 e32_cmd_read_operating(struct E32 *dev);
 

@@ -335,6 +335,59 @@ e32_cmd_read_settings(struct E32 *dev)
   return 0;
 }
 
+void
+e32_print_settings(struct E32 *dev)
+{
+  if(dev->power_down_save)
+    printf("Power Down Save:          Save parameters on power down\n");
+  else
+    printf("Power Down Save:          Discard parameters on power down\n");
+
+  printf("Address:                  0x%02x%02x\n", dev->addh, dev->addl);
+
+  switch(dev->parity)
+  {
+  case 0:
+    printf("Parity:                   8N1\n"); 
+    break;
+  case 1:
+    printf("Parity:                   8O1\n"); 
+    break;
+  case 2:
+    printf("Parity:                   8E1\n"); 
+    break;
+  case 3:
+    printf("Parity:                   8N1\n"); 
+    break;
+  default:
+    printf("Parity:                   Unknown\n"); 
+    break;
+  }
+
+  printf("UART Baud Rate:           %d bps\n", dev->uart_baud);
+  printf("Air Data Rate:            %d bps\n", dev->air_data_rate);
+  printf("Channel:                  %d MHz\n", dev->channel);
+
+  if(dev->transmission_mode)
+    printf("Transmission Mode:        Transparent\n");
+  else
+    printf("Transmission Mode:        Fixed\n");
+
+  if(dev->io_drive)
+    printf("IO Drive:                 TXD and AUX push-pull output, RXD pull-up input\n");
+  else
+    printf("IO Drive:                 TXD and AUX open-collector output, RXD open-collector input\n");
+
+  printf("Wireless Wakeup Time:     %d ms\n", dev->wireless_wakeup_time);
+
+  if(dev->fec)
+    printf("Forward Error Correction: on\n");
+  else
+    printf("Forward Error Correction: off\n");
+
+  printf("TX Power:                 %d dBm\n", dev->tx_power_dbm);
+}
+
 int
 e32_cmd_read_operating(struct E32 *dev)
 {
@@ -388,7 +441,9 @@ e32_cmd_read_version(struct E32 *dev)
 void
 e32_print_version(struct E32 *dev)
 {
-  printf("frequency [MHz]: %d, version: %d, features %d\n", dev->frequency_mhz, dev->version, dev->features);
+  printf("Frequency:                %d MHz\n", dev->frequency_mhz);
+  printf("Version:                  %d\n", dev->version);
+  printf("Features:                 0x%02x\n", dev->features);
 }
 
 int

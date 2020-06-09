@@ -70,7 +70,10 @@ main(int argc, char *argv[])
     ret |= e32_cmd_read_version(&dev);
     ret |= e32_cmd_read_settings(&dev);
     if(!ret)
+    {
       e32_print_version(&dev);
+      e32_print_settings(&dev);
+    }
     goto cleanup;
   }
 
