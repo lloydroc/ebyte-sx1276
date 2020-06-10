@@ -256,7 +256,7 @@ gpio_set_direction(int gpio, int input)
 
 // open file /sys/class/gpio/gpio4/value
 int
-gpio_open(int gpio, int input)
+gpio_open(int gpio)
 {
     int fd;
     char path[64];
@@ -269,10 +269,7 @@ gpio_open(int gpio, int input)
     {
         err_output("Exception opening %s will retry\n", path);
         fd = gpio_check_permissions_bug(path);
-        if(input)
-          fd = open(path, O_RDONLY);
-        else
-          fd = open(path, O_WRONLY);
+        fd = open(path, O_RDWR);
         if(fd == -1)
           err_output("Exception opening %s\n", path);
     }
@@ -385,13 +382,14 @@ gpio_write(int fd, int val)
 }
 
 int
-gpio_read(int fd, char *val)
+gpio_read(int fd, int *val)
 {
     char cval[2];
     int ret;
+    lseek(fd, 0, SEEK_SET);
     ret = read(fd, cval, 2);
-    if(ret!=2)
-        perror("GPIO: unable to perform gpio read");
+    if(ret != 2)
+        err_output("GPIO: unable to perform gpio read got %d bytes", ret);
     *val = cval[0]-48;
     return ret;
 }

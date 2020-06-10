@@ -18,6 +18,7 @@ struct options
   int help;
   int reset;
   int test;
+  int verbose;
   int status;
   int configure;
   int uart_dev;
@@ -26,6 +27,7 @@ struct options
   int gpio_aux;
   int mode;
   int daemon;
+  int interactive;
   FILE* data_file;
   int fd_socket_udp;
   struct sockaddr_in socket_udp_dest;

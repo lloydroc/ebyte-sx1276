@@ -11,11 +11,13 @@ usage(void)
 -x --reset                    SW Reset\n\
 -t --test                     Perform a test\n\
 -c --configure                Write Configuration\n\
+-v --verbose                  Verbose Output\n\
 -s --status                   Get status model, frequency, address, channel, data rate, baud, parity and transmit power.\n\
 -m --mode MODE                Set mode to normal, wake-up, power-save or sleep.\n\
    --m0                       GPIO M0 Pin for output\n\
    --m1                       GPIO M1 Pin for output\n\
    --aux                      GPIO Aux Pin for input interrupt\n\
+-i --interactive              Take input from STDIN\n\
 -f --file FILENAME            Output data to a File\n\
 -u --socket-udp HOST:PORT     Output data to a UDP Socket\n\
 -b --binary                   Used with the -f and -u options for binary output\n\
@@ -29,6 +31,7 @@ options_init(struct options *opts)
   opts->reset = 0;
   opts->help = 0;
   opts->test = 0;
+  opts->verbose = 0;
   opts->status = 0;
   opts->mode = -1;
   opts->configure = 0;
@@ -139,26 +142,28 @@ options_parse(struct options *opts, int argc, char *argv[])
   int ret = 0;
   static struct option long_options[] =
   {
-    {"help",                     no_argument, 0,   0},
-    {"reset",                    no_argument, 0,   0},
-    {"test",                     no_argument, 0,   0},
-    {"status",                   no_argument, 0,   0},
+    {"help",                     no_argument, 0, 'h'},
+    {"reset",                    no_argument, 0, 'r'},
+    {"test",                     no_argument, 0, 't'},
+    {"verbose",                  no_argument, 0, 'v'},
+    {"status",                   no_argument, 0, 's'},
     {"configure",                no_argument, 0,   0},
     {"deamon",                   no_argument, 0, 'd'},
     {"mode",               required_argument, 0, 'm'},
     {"m0",                 required_argument, 0,   0},
     {"m1",                 required_argument, 0,   0},
     {"aux",                required_argument, 0,   0},
+    {"interactive",              no_argument, 0, 'i'},
     {"file",               required_argument, 0, 'f'},
     {"socket-udp",         required_argument, 0, 'u'},
-    {"binary",                   no_argument, 0, 'u'},
+    {"binary",                   no_argument, 0, 'b'},
     {0,                                    0, 0,   0}
   };
 
   while(1)
   {
     option_index = 0;
-    c = getopt_long_only(argc, argv, "hxtcsm:f:u:bd", long_options, &option_index);
+    c = getopt_long_only(argc, argv, "hxtvcsm:if:u:bd", long_options, &option_index);
 
     if(c == -1)
       break;
@@ -172,6 +177,8 @@ options_parse(struct options *opts, int argc, char *argv[])
         opts->reset = 1;
       else if(strcmp("test", long_options[option_index].name) == 0)
         opts->test = 1;
+      else if(strcmp("verbose", long_options[option_index].name) == 0)
+        opts->verbose = 1;
       else if(strcmp("status", long_options[option_index].name) == 0)
         opts->status = 1;
       else if(strcmp("configure", long_options[option_index].name) == 0)
@@ -188,6 +195,8 @@ options_parse(struct options *opts, int argc, char *argv[])
         opts->gpio_m1 = atoi(optarg);
       else if(strcmp("aux", long_options[option_index].name) == 0)
         opts->gpio_aux = atoi(optarg);
+      else if(strcmp("interactive", long_options[option_index].name) == 0)
+        opts->interactive = 1;
       else if(strcmp("file", long_options[option_index].name) == 0)
       {
         opts->data_file = options_open_file_data(optarg);
@@ -209,6 +218,9 @@ options_parse(struct options *opts, int argc, char *argv[])
       case 't':
         opts->test = 1;
         break;
+      case 'v':
+        opts->verbose = 1;
+        break;
       case 'c':
         opts->configure = 1;
         break;
@@ -219,6 +231,9 @@ options_parse(struct options *opts, int argc, char *argv[])
         opts->mode = options_get_mode(optarg);
         if(opts->mode == -1)
           ret |= 1;
+        break;
+      case 'i':
+        opts->interactive = 1;
         break;
       case 'f':
         opts->data_file = options_open_file_data(optarg);

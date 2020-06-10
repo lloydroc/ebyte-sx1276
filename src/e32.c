@@ -3,6 +3,10 @@
 static int
 e32_init_gpio(struct options *opts, struct E32 *dev)
 {
+  int inputs[64], outputs[64];
+  int ninputs, noutputs;
+  int hm0=0, hm1=0, haux=0;
+
   if(gpio_exists())
     return 1;
 
@@ -15,38 +19,73 @@ e32_init_gpio(struct options *opts, struct E32 *dev)
   if(gpio_valid(opts->gpio_aux))
     return 4;
 
-  if(gpio_export(opts->gpio_m0))
+  /* check if gpio is already set */
+  if(gpio_get_exports(inputs, outputs, &ninputs, &noutputs))
     return 5;
 
-  if(gpio_export(opts->gpio_m1))
-    return 6;
+  for(int i=0; i<noutputs; i++)
+  {
+    if(outputs[i] == opts->gpio_m0)
+      hm0 = 1;
+    if(outputs[i] == opts->gpio_m1)
+      hm1 = 1;
+  }
 
-  if(gpio_export(opts->gpio_aux))
-    return 6;
+  for(int i=0; i<ninputs; i++)
+  {
+    if(inputs[i] == opts->gpio_aux)
+      haux = 1;
+  }
 
-  if(gpio_set_output(opts->gpio_m0))
-    return 7;
+  if(!hm0)
+  {
+    if(gpio_export(opts->gpio_m0))
+      return 6;
 
-  if(gpio_set_output(opts->gpio_m1))
-    return 8;
+    if(gpio_set_output(opts->gpio_m0))
+      return 7;
+  }
 
-  if(gpio_set_input(opts->gpio_aux))
-    return 9;
+  if(!hm1)
+  {
+    if(gpio_export(opts->gpio_m1))
+      return 7;
 
-  if(gpio_set_edge_rising(opts->gpio_aux))
-    return 10;
+    if(gpio_set_output(opts->gpio_m1))
+      return 8;
+  }
 
-  dev->gpio_m0_fd = gpio_open_output(opts->gpio_m0);
-  if(dev->gpio_m0_fd == -1)
-    return 11;
+  if(!haux)
+  {
+    if(gpio_export(opts->gpio_aux))
+      return 9;
 
-  dev->gpio_m1_fd = gpio_open_output(opts->gpio_m1);
-  if(dev->gpio_m1_fd == -1)
+    if(gpio_set_input(opts->gpio_aux))
+      return 10;
+
+    if(gpio_set_edge_rising(opts->gpio_aux))
+      return 11;
+  }
+
+  int edge;
+  if(gpio_get_edge(opts->gpio_aux, &edge))
     return 12;
 
-  dev->gpio_aux_fd = gpio_open_input(opts->gpio_aux);
+  if(edge != 1)
+    if(gpio_set_edge_rising(opts->gpio_aux))
+        return 13;
+
+  dev->gpio_m0_fd = gpio_open(opts->gpio_m0);
+  if(dev->gpio_m0_fd == -1)
+    return 14;
+
+  dev->gpio_m1_fd = gpio_open(opts->gpio_m1);
+  if(dev->gpio_m1_fd == -1)
+    return 15;
+
+  dev->gpio_aux_fd = gpio_open(opts->gpio_aux);
   if(dev->gpio_aux_fd == -1)
-    return 13;
+    return 16;
 
   return 0;
 }
@@ -72,6 +111,9 @@ e32_init(struct options *opts, struct E32 *dev)
   if(ret == -1)
     return ret;
 
+  dev->verbose = opts->verbose;
+  dev->prev_mode = -1;
+
   return 0;
 }
 
@@ -80,25 +122,25 @@ e32_aux_poll(struct E32 *dev)
 {
   int timeout;
   struct pollfd pfd;
-  int fd;
   int ret;
   char buf[2];
 
+  /*
+  printf("reading aux before poll\n");
+  lseek(dev->gpio_aux_fd, 0, SEEK_SET);
   ret = gpio_read(dev->gpio_aux_fd, buf) != 2;
   if(ret == 0 && buf[0] == 1)
-  {
-    fprintf(stderr, "AUX is already high\n");
-    return 1;
-  }
+    return 0;
+  */
+  lseek(dev->gpio_aux_fd, 0, SEEK_SET);
 
   // we will wait 100ms+10ms buffer
   timeout = 110;
 
-  fd = dev->gpio_aux_fd;
-
-  pfd.fd = fd;
+  pfd.fd = dev->gpio_aux_fd;
   pfd.events = POLLPRI;
 
+  printf("polling aux\n");
   ret = poll(&pfd, 1, timeout);
   if(ret == 0)
   {
@@ -111,8 +153,9 @@ e32_aux_poll(struct E32 *dev)
     return 2;
   }
 
-  lseek(fd, 0, SEEK_SET);
-  read(fd, buf, sizeof(buf));
+  printf("reading aux after poll\n");
+  lseek(dev->gpio_aux_fd, 0, SEEK_SET);
+  read(dev->gpio_aux_fd, buf, sizeof(buf));
 
   usleep(10000);
 
@@ -129,6 +172,9 @@ e32_set_mode(struct E32 *dev, int mode)
     return 1;
   }
 
+  if(dev->mode == mode)
+    return 0;
+
   int m0 = mode & 0x01;
   int m1 = mode & 0x02;
 
@@ -143,11 +189,14 @@ e32_set_mode(struct E32 *dev, int mode)
   else
     return ret;
 
+  printf("wrote mode %d, prev mode is %d\n", mode, dev->prev_mode);
   if(dev->prev_mode == 3 && dev->mode != 3)
   {
     if(e32_aux_poll(dev))
       return 2;
   }
+
+  usleep(10000);
 
   return ret;
 }
@@ -157,8 +206,9 @@ e32_get_mode(struct E32 *dev)
 {
   int ret;
 
-  char m0, m1;
+  int m0, m1;
 
+  puts("reading mode pins");
   ret  = gpio_read(dev->gpio_m0_fd, &m0) != 2;
   ret |= gpio_read(dev->gpio_m1_fd, &m1) != 2;
 
@@ -168,6 +218,7 @@ e32_get_mode(struct E32 *dev)
   m1 <<= 1;
   dev->mode = m0+m1;
 
+  printf("got mode %d\n", dev->mode);
   return ret;
 }
 
@@ -197,13 +248,25 @@ e32_cmd_read_settings(struct E32 *dev)
   ssize_t bytes;
   const uint8_t cmd[3] = {0xC1, 0xC1, 0xC1};
   uint8_t buf[6];
+  uint8_t *buf_ptr;
+  puts("writing settings command");
   bytes = write(dev->uart_fd, cmd, 3);
   if(bytes == -1)
    return -1;
 
-  bytes = read(dev->uart_fd, buf, 6);
-  if(bytes == -1)
-    return -1;
+  puts("reading settings command");
+  bytes = 0;
+  buf_ptr = buf;
+  do
+  {
+    bytes += read(dev->uart_fd, buf_ptr++, 1);
+    printf("bytes %d\n", bytes);
+    if(bytes == -1)
+      return -1;
+  }
+  while(bytes < 6);
+
+  printf("bytes %d.\n", bytes);
 
   if(buf[0] != 0xC0 && buf[0] != 0xC2)
     return -2;
@@ -407,11 +470,23 @@ e32_cmd_read_version(struct E32 *dev)
   ssize_t bytes;
   const uint8_t cmd[3] = {0xC3, 0xC3, 0xC3};
   uint8_t ver_buf[4];
+  uint8_t *buf;
+  puts("writing version command");
   bytes = write(dev->uart_fd, cmd, 3);
   if(bytes == -1)
    return -1;
 
-  bytes = read(dev->uart_fd, ver_buf, 4);
+  puts("reading version");
+  bytes = 0;
+  buf = ver_buf;
+  do
+  {
+    bytes += read(dev->uart_fd, buf++, 1);
+    printf("bytes %d\n", bytes);
+  }
+  while(bytes < 4);
+
+  printf("bytes %d.\n", bytes);
   if(ver_buf[0] != 0xC3)
     return -1;
 
@@ -472,9 +547,10 @@ e32_cmd_write_settings(struct E32 *dev)
 }
 
 int
-e32_transmit(struct E32 *dev, uint8_t *buf, uint8_t buf_len)
+e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len)
 {
   ssize_t bytes;
+  for(int i=0; i<buf_len; i++) printf("%d ", buf[i]);
   bytes = write(dev->uart_fd, buf, buf_len);
   if(bytes != buf_len)
     return 1;
@@ -483,9 +559,73 @@ e32_transmit(struct E32 *dev, uint8_t *buf, uint8_t buf_len)
 }
 
 int
-e32_receive(struct E32 *dev, uint8_t *buf, uint8_t buf_len)
+e32_receive(struct E32 *dev, uint8_t *buf, size_t buf_len)
 {
   int bytes;
   bytes = read(dev->uart_fd, buf, buf_len);
   return bytes != buf_len;
+}
+
+int
+e32_poll(struct E32 *dev)
+{
+  ssize_t bytes, total_bytes;
+  struct pollfd pfd[2];
+  int ret;
+  uint8_t buf[512];
+  uint8_t *buf_ptr;
+
+  pfd[0].fd = fileno(stdin);
+  pfd[0].events = POLLIN;
+
+  pfd[1].fd = dev->uart_fd;
+  pfd[1].events = POLLIN;
+
+  while(1)
+  {
+    printf("polling file descriptors\n");
+    ret = poll(pfd, 2, -1);
+    if(ret == 0)
+    {
+      fprintf(stderr, "poll timed out\n");
+      return 1;
+    }
+    else if (ret < 0)
+    {
+      err_output("poll");
+      return 2;
+    }
+
+    if(pfd[0].revents & POLLIN)
+    {
+      pfd[0].revents ^= POLLIN;
+
+      printf("reading from fd %d\n", pfd[0].fd);
+      bytes = read(pfd[0].fd, &buf, 512);
+      printf("got %d bytes\n", bytes);
+
+      printf("writing to uart\n");
+      if(e32_transmit(dev, buf, bytes))
+        return 3;
+    }
+
+    if(pfd[1].revents & POLLIN)
+    {
+      pfd[1].revents ^= POLLIN;
+      buf_ptr = buf;
+      total_bytes = 0;
+
+      printf("reading from uart\n");
+      do
+      {
+        bytes = read(pfd[1].fd, buf_ptr++, 1);
+        total_bytes += bytes;
+      }
+      while(bytes != 0);
+      buf[total_bytes] = '\0';
+      printf("%s\n", buf);
+    }
+  }
+
+  return 0;
 }

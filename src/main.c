@@ -57,9 +57,9 @@ main(int argc, char *argv[])
 
   if(opts.test)
   {
-    uint8_t buf[58];
-    for(int i=0; i<58; i++) buf[i] = i;
-    e32_transmit(&dev, buf, 58);
+    uint8_t buf[512];
+    for(int i=0; i<512; i++) buf[i] = i;
+    e32_transmit(&dev, buf, 512);
     goto cleanup;
   }
   if(opts.reset)
@@ -70,14 +70,23 @@ main(int argc, char *argv[])
   }
   if(opts.status)
   {
-    ret |= e32_set_mode(&dev, 3);
-    ret |= e32_cmd_read_version(&dev);
-    ret |= e32_cmd_read_settings(&dev);
-    if(!ret)
+    if(e32_set_mode(&dev, 3))
     {
-      e32_print_version(&dev);
-      e32_print_settings(&dev);
+      fprintf(stderr, "unable to go to sleep mode\n");
+      goto cleanup;
     }
+    if(e32_cmd_read_version(&dev))
+    {
+      fprintf(stderr, "unable to read version\n");
+      goto cleanup;
+    }
+    if(e32_cmd_read_settings(&dev))
+    {
+      fprintf(stderr, "unable to read settings\n");
+      goto cleanup;
+    }
+    e32_print_version(&dev);
+    e32_print_settings(&dev);
     goto cleanup;
   }
 
@@ -130,9 +139,7 @@ main(int argc, char *argv[])
   lsm9ds1_ag_poll(&dev, &opts);
 
 */
-  uint8_t buf[58];
-  e32_receive(&dev, buf, 58);
-  for(int i=0; i<58; i++) printf("%d ", buf[i]);
+  e32_poll(&dev);
 cleanup:
   ret |= e32_deinit(&opts, &dev);
 

@@ -65,11 +65,8 @@ gpio_set_edge(int gpio, int edge);
 int
 gpio_get_edge(int gpio, int *edge);
 
-#define gpio_open_output(gpio) gpio_open(gpio,0)
-#define gpio_open_input(gpio) gpio_open(gpio,1)
-
 int
-gpio_open(int gpio, int input);
+gpio_open(int gpio);
 
 int
 gpio_close(int fd);
@@ -78,7 +75,7 @@ int
 gpio_write(int fd, int val);
 
 int
-gpio_read(int fd, char *val);
+gpio_read(int fd, int *val);
 
 int
 gpio_unexport(int gpio);
