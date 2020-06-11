@@ -27,8 +27,14 @@ tty_open(char *ptyName)
   cfmakeraw(&ttyOrig);
 
   ttyOrig.c_cflag |= CREAD | CLOCAL;
-  ttyOrig.c_cc[VMIN] = 1;
-  ttyOrig.c_cc[VTIME] = 0; /* non-zero won't timeout on read anways */
+
+  /* polling read - where read will return immediately with
+   * min(bytes avail, bytes requested)
+   * and bytes avail can be 0
+   */
+  ttyOrig.c_cc[VMIN] = 0;
+  ttyOrig.c_cc[VTIME] = 0;
+
   if(tcsetattr(UART, TCSANOW, &ttyOrig) == -1)
   {
     err_output("error setting terminal attributes");

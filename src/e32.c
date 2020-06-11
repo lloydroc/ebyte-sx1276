@@ -616,6 +616,7 @@ e32_poll(struct E32 *dev)
     if(pfd[1].revents & POLLIN)
     {
       pfd[1].revents ^= POLLIN;
+
       buf_ptr = buf;
       total_bytes = 0;
 
@@ -624,6 +625,7 @@ e32_poll(struct E32 *dev)
       {
         bytes = read(pfd[1].fd, buf_ptr++, 1);
         total_bytes += bytes;
+        printf("uart: got %d bytes, total_bytes %d\n", bytes, total_bytes);
       }
       while(bytes != 0);
       buf[total_bytes] = '\0';
