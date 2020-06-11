@@ -169,11 +169,15 @@ e32_set_mode(struct E32 *dev, int mode)
 
   if(e32_get_mode(dev))
   {
+    fprintf(stderr, "unable to get mode\n");
     return 1;
   }
 
   if(dev->mode == mode)
+  {
+    printf("mode %d unchanged\n", mode);
     return 0;
+  }
 
   int m0 = mode & 0x01;
   int m1 = mode & 0x02;
@@ -189,7 +193,7 @@ e32_set_mode(struct E32 *dev, int mode)
   else
     return ret;
 
-  printf("wrote mode %d, prev mode is %d\n", mode, dev->prev_mode);
+  printf("new mode %d, prev mode is %d\n", mode, dev->prev_mode);
   if(dev->prev_mode == 3 && dev->mode != 3)
   {
     if(e32_aux_poll(dev))
