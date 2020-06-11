@@ -123,7 +123,7 @@ e32_aux_poll(struct E32 *dev)
   int timeout;
   struct pollfd pfd;
   int ret;
-  char buf[2];
+  int gpio_aux_val;
 
   /*
   printf("reading aux before poll\n");
@@ -140,7 +140,8 @@ e32_aux_poll(struct E32 *dev)
   pfd.fd = dev->gpio_aux_fd;
   pfd.events = POLLPRI;
 
-  printf("polling aux\n");
+  if(dev->verbose)
+    printf("waiting for rising edge of AUX\n");
   ret = poll(&pfd, 1, timeout);
   if(ret == 0)
   {
@@ -153,13 +154,18 @@ e32_aux_poll(struct E32 *dev)
     return 2;
   }
 
-  printf("reading aux after poll\n");
+  if(dev->verbose)
+    printf("rising edge of AUX found\n");
   lseek(dev->gpio_aux_fd, 0, SEEK_SET);
-  read(dev->gpio_aux_fd, buf, sizeof(buf));
+  gpio_read(dev->gpio_aux_fd, &gpio_aux_val);
+  if(dev->verbose)
+    printf("AUX value is %d\n", gpio_aux_val);
 
+  if(dev->verbose)
+    printf("sleeping\n");
   usleep(10000);
 
-  return 0;
+  return gpio_aux_val != 1;
 }
 
 int
@@ -571,24 +577,47 @@ e32_receive(struct E32 *dev, uint8_t *buf, size_t buf_len)
 }
 
 int
-e32_poll(struct E32 *dev)
+e32_poll(struct E32 *dev, struct options *opts)
 {
   ssize_t bytes, total_bytes;
-  struct pollfd pfd[2];
+  struct pollfd pfd[3];
   int ret;
-  uint8_t buf[512];
+  uint8_t buf[513];
   uint8_t *buf_ptr;
+  int loop;
+  int tty;
 
-  pfd[0].fd = fileno(stdin);
-  pfd[0].events = POLLIN;
+  tty = isatty(fileno(stdin));
 
+  // used for stdin or a pipe
+  pfd[0].fd = -1;
+  pfd[0].events = 0;
+
+  // used for the uart
   pfd[1].fd = dev->uart_fd;
   pfd[1].events = POLLIN;
 
-  while(1)
+  // used for an input file
+  pfd[2].fd = -1;
+  pfd[2].events = 0;
+
+  if(opts->input_standard)
   {
-    printf("polling file descriptors\n");
-    ret = poll(pfd, 2, -1);
+    pfd[0].fd = fileno(stdin);
+    pfd[0].events = POLLIN;
+  }
+
+  if(opts->input_file)
+  {
+    pfd[2].fd = fileno(opts->input_file);
+    pfd[2].events = POLLIN;
+  }
+
+  printf("polling file descriptors\n");
+  loop = 1;
+  while(loop)
+  {
+    ret = poll(pfd, 3, -1);
     if(ret == 0)
     {
       fprintf(stderr, "poll timed out\n");
@@ -611,6 +640,10 @@ e32_poll(struct E32 *dev)
       printf("writing to uart\n");
       if(e32_transmit(dev, buf, bytes))
         return 3;
+
+      /* sent input through a pipe */
+      if(!tty && bytes < 512)
+        loop = 0;
     }
 
     if(pfd[1].revents & POLLIN)
@@ -623,13 +656,31 @@ e32_poll(struct E32 *dev)
       printf("reading from uart\n");
       do
       {
-        bytes = read(pfd[1].fd, buf_ptr++, 1);
+        bytes = read(pfd[1].fd, buf_ptr++, 512);
         total_bytes += bytes;
         printf("uart: got %d bytes, total_bytes %d\n", bytes, total_bytes);
       }
       while(bytes != 0);
+
       buf[total_bytes] = '\0';
       printf("%s\n", buf);
+    }
+
+    if(pfd[2].revents & POLLIN)
+    {
+      pfd[2].revents ^= POLLIN;
+
+      printf("reading from fd %d\n", pfd[2].fd);
+      bytes = read(pfd[2].fd, &buf, 512);
+      printf("got %d bytes\n", bytes);
+
+      printf("writing to uart\n");
+      if(e32_transmit(dev, buf, bytes))
+        return 3;
+
+      /* we read them all from a file */
+      if(bytes < 512)
+        loop = 0;
     }
   }
 

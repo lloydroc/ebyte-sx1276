@@ -27,15 +27,15 @@ struct options
   int gpio_aux;
   int mode;
   int daemon;
-  int interactive;
-  FILE* data_file;
+  int input_standard;
+  FILE* input_file;
   int fd_socket_udp;
   struct sockaddr_in socket_udp_dest;
   int binary;
 };
 
 void
-usage(void);
+usage(char *progname);
 
 void
 options_init(struct options *opts);

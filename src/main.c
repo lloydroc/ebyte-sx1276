@@ -36,12 +36,12 @@ main(int argc, char *argv[])
   ret = options_parse(&opts, argc, argv);
   if(ret || opts.help)
   {
-    usage();
+    usage(argv[0]);
     return ret;
   }
   else if(opts.help)
   {
-    usage();
+    usage(argv[0]);
     return EXIT_SUCCESS;
   }
 
@@ -89,7 +89,6 @@ main(int argc, char *argv[])
     e32_print_settings(&dev);
     goto cleanup;
   }
-
 
   /*if(lsm9ds1_configure_ag_interrupt(opts.gpio_interrupt_ag, &fd))
   {
@@ -139,7 +138,7 @@ main(int argc, char *argv[])
   lsm9ds1_ag_poll(&dev, &opts);
 
 */
-  e32_poll(&dev);
+  e32_poll(&dev, &opts);
 cleanup:
   ret |= e32_deinit(&opts, &dev);
 

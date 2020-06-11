@@ -82,6 +82,6 @@ int
 e32_receive(struct E32 *dev, uint8_t *buf, size_t buf_len);
 
 int
-e32_poll(struct E32 *dev);
+e32_poll(struct E32 *dev, struct options* opts);
 
 #endif

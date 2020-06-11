@@ -1,9 +1,9 @@
 #include "options.h"
 
 void
-usage(void)
+usage(char *progname)
 {
-  printf("Usage: lsm9ds1 [OPTIONS]\n\n");
+  printf("Usage: %s [OPTIONS]\n\n", progname);
   printf("A command line tool to read data from the ST LSM9DS1.\n");
   printf("After wiring up the lsm9ds1 you MUST run a configuration on it first.\n\n");
   printf("OPTIONS:\n\
@@ -17,8 +17,7 @@ usage(void)
    --m0                       GPIO M0 Pin for output\n\
    --m1                       GPIO M1 Pin for output\n\
    --aux                      GPIO Aux Pin for input interrupt\n\
--i --interactive              Take input from STDIN\n\
--f --file FILENAME            Output data to a File\n\
+   --in-file FILENAME         Read intput from a File\n\
 -u --socket-udp HOST:PORT     Output data to a UDP Socket\n\
 -b --binary                   Used with the -f and -u options for binary output\n\
 -d --daemon                   Run as a Daemon\n\
@@ -40,7 +39,8 @@ options_init(struct options *opts)
   opts->gpio_m1 = 24;
   opts->gpio_aux = 18;
   opts->daemon = 0;
-  opts->data_file = stdout;
+  opts->input_standard = 0;
+  opts->input_file = NULL;
   opts->fd_socket_udp = -1;
 }
 
@@ -60,9 +60,9 @@ options_get_mode(char *optarg)
 }
 
 static FILE*
-options_open_file_data(char *optarg)
+options_open_input_file(char *optarg)
 {
-  FILE* file = fopen(optarg, "w");
+  FILE* file = fopen(optarg, "r");
   if(file == NULL)
   {
     err_output("unable to open file %s", optarg);
@@ -147,23 +147,22 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"test",                     no_argument, 0, 't'},
     {"verbose",                  no_argument, 0, 'v'},
     {"status",                   no_argument, 0, 's'},
-    {"configure",                no_argument, 0,   0},
-    {"deamon",                   no_argument, 0, 'd'},
+    {"configure",                no_argument, 0, 'c'},
     {"mode",               required_argument, 0, 'm'},
     {"m0",                 required_argument, 0,   0},
     {"m1",                 required_argument, 0,   0},
     {"aux",                required_argument, 0,   0},
-    {"interactive",              no_argument, 0, 'i'},
-    {"file",               required_argument, 0, 'f'},
+    {"in-file",            required_argument, 0,   0},
     {"socket-udp",         required_argument, 0, 'u'},
     {"binary",                   no_argument, 0, 'b'},
+    {"deamon",                   no_argument, 0, 'd'},
     {0,                                    0, 0,   0}
   };
 
   while(1)
   {
     option_index = 0;
-    c = getopt_long_only(argc, argv, "hxtvcsm:if:u:bd", long_options, &option_index);
+    c = getopt_long(argc, argv, "hxtvcsm:u:f:bd", long_options, &option_index);
 
     if(c == -1)
       break;
@@ -171,43 +170,16 @@ options_parse(struct options *opts, int argc, char *argv[])
     switch(c)
     {
     case 0:
-      if(strcmp("help", long_options[option_index].name) == 0)
-        opts->help = 1;
-      else if(strcmp("reset", long_options[option_index].name) == 0)
-        opts->reset = 1;
-      else if(strcmp("test", long_options[option_index].name) == 0)
-        opts->test = 1;
-      else if(strcmp("verbose", long_options[option_index].name) == 0)
-        opts->verbose = 1;
-      else if(strcmp("status", long_options[option_index].name) == 0)
-        opts->status = 1;
-      else if(strcmp("configure", long_options[option_index].name) == 0)
-        opts->configure = 1;
-      else if(strcmp("mode", long_options[option_index].name) == 0)
-      {
-        opts->mode = options_get_mode(optarg);
-        if(opts->mode == -1)
-          ret |= 1;
-      }
-      else if(strcmp("m0", long_options[option_index].name) == 0)
-        opts->gpio_m0 = atoi(optarg);
-      else if(strcmp("m1", long_options[option_index].name) == 0)
+      if(strcmp("m1", long_options[option_index].name) == 0)
         opts->gpio_m1 = atoi(optarg);
       else if(strcmp("aux", long_options[option_index].name) == 0)
         opts->gpio_aux = atoi(optarg);
-      else if(strcmp("interactive", long_options[option_index].name) == 0)
-        opts->interactive = 1;
-      else if(strcmp("file", long_options[option_index].name) == 0)
+      else if(strcmp("in-file", long_options[option_index].name) == 0)
       {
-        opts->data_file = options_open_file_data(optarg);
-        ret |= opts->data_file == NULL;
+        opts->input_file = options_open_input_file(optarg);
+        ret |= opts->input_file == NULL;
       }
-      else if(strcmp("socket-udp", long_options[option_index].name) == 0)
-        ret |= options_open_socket_udp(opts, optarg);
-      else if(strcmp("binary", long_options[option_index].name) == 0)
-        opts->binary = 1;
-      else if(strcmp("daemon", long_options[option_index].name) == 0)
-        opts->daemon = 1;
+      break;
 
       case 'h':
         opts->help = 1;
@@ -232,13 +204,6 @@ options_parse(struct options *opts, int argc, char *argv[])
         if(opts->mode == -1)
           ret |= 1;
         break;
-      case 'i':
-        opts->interactive = 1;
-        break;
-      case 'f':
-        opts->data_file = options_open_file_data(optarg);
-        ret |= opts->data_file == NULL;
-        break;
       case 'u':
         ret |= options_open_socket_udp(opts, optarg);
         break;
@@ -250,6 +215,12 @@ options_parse(struct options *opts, int argc, char *argv[])
         break;
     }
   }
+
+  if(opts->daemon)
+    opts->input_standard = 0;
+
+  if(opts->input_file != NULL)
+    opts->input_standard = 0;
 
   if (optind < argc)
   {
