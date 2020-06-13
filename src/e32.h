@@ -43,10 +43,10 @@ enum E32_mode
 };
 
 int
-e32_init(struct options *opts, struct E32 *dev);
+e32_init(struct E32 *dev, struct options *opts);
 
 int
-e32_deinit(struct options *opts, struct E32 *dev);
+e32_deinit(struct E32 *dev, struct options *opts);
 
 int
 e32_set_mode(struct E32 *dev, int mode);

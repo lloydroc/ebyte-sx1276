@@ -156,6 +156,7 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"m1",                 required_argument, 0,   0},
     {"aux",                required_argument, 0,   0},
     {"in-file",            required_argument, 0,   0},
+    {"out-file",           required_argument, 0,   0},
     {"socket-udp",         required_argument, 0, 'u'},
     {"binary",                   no_argument, 0, 'b'},
     {"deamon",                   no_argument, 0, 'd'},

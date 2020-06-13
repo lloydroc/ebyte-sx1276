@@ -98,7 +98,7 @@ e32_init_uart(struct E32 *dev)
 }
 
 int
-e32_init(struct options *opts, struct E32 *dev)
+e32_init(struct E32 *dev, struct options *opts)
 {
   int ret;
 
@@ -232,7 +232,7 @@ e32_get_mode(struct E32 *dev)
 }
 
 int
-e32_deinit(struct options* opts, struct E32 *dev)
+e32_deinit(struct E32 *dev, struct options* opts)
 {
   int ret;
   ret = 0;
@@ -245,6 +245,8 @@ e32_deinit(struct options* opts, struct E32 *dev)
   ret |= gpio_unexport(opts->gpio_m1);
   ret |= gpio_unexport(opts->gpio_aux);
 */
+  if(opts->output_file)
+    ret |= fclose(opts->output_file);
 
   ret |= close(dev->uart_fd);
   return ret;
@@ -661,24 +663,28 @@ e32_poll(struct E32 *dev, struct options *opts)
       buf_ptr = buf;
       total_bytes = 0;
 
-      printf("reading from uart\n");
+      if(opts->verbose)
+        printf("reading from uart\n");
       do
       {
         bytes = read(pfd[1].fd, buf_ptr++, 512);
         total_bytes += bytes;
-        printf("uart: got %d bytes, total_bytes %d\n", bytes, total_bytes);
+        if(opts->verbose)
+          printf("uart: got %d bytes, total_bytes %d\n", bytes, total_bytes);
       }
       while(bytes != 0);
 
       if(opts->output_file != NULL)
       {
-        bytes = fwrite(buf, 1, bytes, opts->output_file);
+        bytes = fwrite(buf, 1, total_bytes, opts->output_file);
+        if(bytes != total_bytes)
+          fprintf(stderr, "wrote %d of %d bytes\n", bytes, total_bytes);
       }
 
       if(opts->output_standard)
       {
         buf[total_bytes] = '\0';
-        printf("%s\n", buf);
+        printf("%s", buf);
       }
     }
 
@@ -686,11 +692,16 @@ e32_poll(struct E32 *dev, struct options *opts)
     {
       pfd[2].revents ^= POLLIN;
 
-      printf("reading from fd %d\n", pfd[2].fd);
-      bytes = read(pfd[2].fd, &buf, 512);
-      printf("got %d bytes\n", bytes);
+      if(opts->verbose)
+        printf("reading from fd %d\n", pfd[2].fd);
 
-      printf("writing to uart\n");
+      bytes = fread(buf, 1, 512, opts->input_file);
+
+      if(opts->verbose)
+        printf("got %d bytes\n", bytes);
+
+      if(opts->verbose)
+        printf("writing to uart\n");
       if(e32_transmit(dev, buf, bytes))
         return 3;
 

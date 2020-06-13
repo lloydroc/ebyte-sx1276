@@ -18,7 +18,7 @@ static
 void signal_handler(int sig)
 {
   int exit_status;
-  exit_status = e32_deinit(&opts, &dev);
+  exit_status = e32_deinit(&dev, &opts);
   exit(exit_status);
 }
 
@@ -45,7 +45,7 @@ main(int argc, char *argv[])
     return EXIT_SUCCESS;
   }
 
-  ret = e32_init(&opts, &dev);
+  ret = e32_init(&dev, &opts);
   if(ret)
     goto cleanup;
 
@@ -140,7 +140,7 @@ main(int argc, char *argv[])
 */
   e32_poll(&dev, &opts);
 cleanup:
-  ret |= e32_deinit(&opts, &dev);
+  ret |= e32_deinit(&dev, &opts);
 
   return ret;
 }
