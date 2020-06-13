@@ -17,7 +17,8 @@ usage(char *progname)
    --m0                       GPIO M0 Pin for output\n\
    --m1                       GPIO M1 Pin for output\n\
    --aux                      GPIO Aux Pin for input interrupt\n\
-   --in-file FILENAME         Read intput from a File\n\
+   --in-file  FILENAME        Read intput from a File\n\
+   --out-file FILENAME        Write output to a File\n\
 -u --socket-udp HOST:PORT     Output data to a UDP Socket\n\
 -b --binary                   Used with the -f and -u options for binary output\n\
 -d --daemon                   Run as a Daemon\n\
@@ -39,8 +40,9 @@ options_init(struct options *opts)
   opts->gpio_m1 = 24;
   opts->gpio_aux = 18;
   opts->daemon = 0;
-  opts->input_standard = 0;
+  opts->input_standard = 1;
   opts->input_file = NULL;
+  opts->output_file = NULL;
   opts->fd_socket_udp = -1;
 }
 
@@ -60,9 +62,9 @@ options_get_mode(char *optarg)
 }
 
 static FILE*
-options_open_input_file(char *optarg)
+options_open_file(char *optarg, char *mode)
 {
-  FILE* file = fopen(optarg, "r");
+  FILE* file = fopen(optarg, mode);
   if(file == NULL)
   {
     err_output("unable to open file %s", optarg);
@@ -174,9 +176,14 @@ options_parse(struct options *opts, int argc, char *argv[])
         opts->gpio_m1 = atoi(optarg);
       else if(strcmp("aux", long_options[option_index].name) == 0)
         opts->gpio_aux = atoi(optarg);
+      else if(strcmp("out-file", long_options[option_index].name) == 0)
+      {
+        opts->output_file = options_open_file(optarg, "w");
+        ret |= opts->output_file == NULL;
+      }
       else if(strcmp("in-file", long_options[option_index].name) == 0)
       {
-        opts->input_file = options_open_input_file(optarg);
+        opts->input_file = options_open_file(optarg, "r");
         ret |= opts->input_file == NULL;
       }
       break;

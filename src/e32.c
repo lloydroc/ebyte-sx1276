@@ -134,8 +134,7 @@ e32_aux_poll(struct E32 *dev)
   */
   lseek(dev->gpio_aux_fd, 0, SEEK_SET);
 
-  // we will wait 100ms+10ms buffer
-  timeout = 110;
+  timeout = 10000;
 
   pfd.fd = dev->gpio_aux_fd;
   pfd.events = POLLPRI;
@@ -560,10 +559,12 @@ int
 e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len)
 {
   ssize_t bytes;
-  for(int i=0; i<buf_len; i++) printf("%d ", buf[i]);
   bytes = write(dev->uart_fd, buf, buf_len);
   if(bytes != buf_len)
-    return 1;
+  {
+    printf("wrote only %d of %d\n", bytes, buf_len);
+    return bytes;
+  }
 
   return e32_aux_poll(dev);
 }
@@ -638,12 +639,19 @@ e32_poll(struct E32 *dev, struct options *opts)
       printf("got %d bytes\n", bytes);
 
       printf("writing to uart\n");
-      if(e32_transmit(dev, buf, bytes))
+      ret = e32_transmit(dev, buf, bytes);
+      if(ret)
+      {
+        printf("error transmitting %d\n", ret);
         return 3;
+      }
 
       /* sent input through a pipe */
       if(!tty && bytes < 512)
+      {
+        printf("getting out of loop\n");
         loop = 0;
+      }
     }
 
     if(pfd[1].revents & POLLIN)
@@ -664,6 +672,11 @@ e32_poll(struct E32 *dev, struct options *opts)
 
       buf[total_bytes] = '\0';
       printf("%s\n", buf);
+
+      if(opts->output_file != NULL)
+      {
+        bytes = fwrite(buf, 1, bytes, opts->output_file);
+      }
     }
 
     if(pfd[2].revents & POLLIN)
@@ -680,7 +693,10 @@ e32_poll(struct E32 *dev, struct options *opts)
 
       /* we read them all from a file */
       if(bytes < 512)
+      {
+        printf("getting out of loop\n");
         loop = 0;
+      }
     }
   }
 

@@ -29,6 +29,7 @@ struct options
   int daemon;
   int input_standard;
   FILE* input_file;
+  FILE* output_file;
   int fd_socket_udp;
   struct sockaddr_in socket_udp_dest;
   int binary;
