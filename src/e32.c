@@ -670,12 +670,15 @@ e32_poll(struct E32 *dev, struct options *opts)
       }
       while(bytes != 0);
 
-      buf[total_bytes] = '\0';
-      printf("%s\n", buf);
-
       if(opts->output_file != NULL)
       {
         bytes = fwrite(buf, 1, bytes, opts->output_file);
+      }
+
+      if(opts->output_standard)
+      {
+        buf[total_bytes] = '\0';
+        printf("%s\n", buf);
       }
     }
 

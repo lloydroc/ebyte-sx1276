@@ -28,6 +28,7 @@ struct options
   int mode;
   int daemon;
   int input_standard;
+  int output_standard;
   FILE* input_file;
   FILE* output_file;
   int fd_socket_udp;

@@ -41,6 +41,7 @@ options_init(struct options *opts)
   opts->gpio_aux = 18;
   opts->daemon = 0;
   opts->input_standard = 1;
+  opts->output_standard = 1;
   opts->input_file = NULL;
   opts->output_file = NULL;
   opts->fd_socket_udp = -1;
@@ -224,10 +225,16 @@ options_parse(struct options *opts, int argc, char *argv[])
   }
 
   if(opts->daemon)
+  {
     opts->input_standard = 0;
+    opts->output_standard = 0;
+  }
 
   if(opts->input_file != NULL)
     opts->input_standard = 0;
+
+  if(opts->output_file != NULL)
+    opts->output_standard = 0;
 
   if (optind < argc)
   {
