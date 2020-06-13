@@ -582,7 +582,7 @@ e32_receive(struct E32 *dev, uint8_t *buf, size_t buf_len)
 int
 e32_poll(struct E32 *dev, struct options *opts)
 {
-  ssize_t bytes, total_bytes;
+  ssize_t bytes;
   struct pollfd pfd[3];
   int ret;
   uint8_t buf[513];
@@ -660,30 +660,19 @@ e32_poll(struct E32 *dev, struct options *opts)
     {
       pfd[1].revents ^= POLLIN;
 
-      buf_ptr = buf;
-      total_bytes = 0;
-
       if(opts->verbose)
         printf("reading from uart\n");
-      do
-      {
-        bytes = read(pfd[1].fd, buf_ptr++, 512);
-        total_bytes += bytes;
-        if(opts->verbose)
-          printf("uart: got %d bytes, total_bytes %d\n", bytes, total_bytes);
-      }
-      while(bytes != 0);
+
+      bytes = read(pfd[1].fd, buf, 512);
 
       if(opts->output_file != NULL)
       {
-        bytes = fwrite(buf, 1, total_bytes, opts->output_file);
-        if(bytes != total_bytes)
-          fprintf(stderr, "wrote %d of %d bytes\n", bytes, total_bytes);
+        bytes = fwrite(buf, 1, bytes, opts->output_file);
       }
 
       if(opts->output_standard)
       {
-        buf[total_bytes] = '\0';
+        buf[bytes] = '\0';
         printf("%s", buf);
       }
     }
@@ -698,14 +687,18 @@ e32_poll(struct E32 *dev, struct options *opts)
       bytes = fread(buf, 1, 512, opts->input_file);
 
       if(opts->verbose)
-        printf("got %d bytes\n", bytes);
+        printf("writing %d to from file to uart\n", bytes);
 
-      if(opts->verbose)
-        printf("writing to uart\n");
       if(e32_transmit(dev, buf, bytes))
         return 3;
 
-      /* we read them all from a file */
+      if(opts->output_standard)
+      {
+        buf[bytes+1] = '\0';
+        printf("%s", buf);
+      }
+
+      /* all bytes read from file */
       if(bytes < 512)
       {
         printf("getting out of loop\n");
