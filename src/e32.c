@@ -1,54 +1,5 @@
 #include "e32.h"
 
-static long
-e32_delay_us(struct E32 *dev, int bytes)
-{
-
-  /*
-   *      s          bytes       8 bits      6 bits FEC
-   * ----------- * --------- * --------- * --------------
-   * air_rate b                   byte         4 bits
-   *
-   * Example:
-   * Air Data Rate =  2.4k
-   * Bytes = 512
-   * FEC: On
-   *
-   * bits we'll send is 512*8*6/4 = 512*2*6 = 6144
-   * seconds is 6144 bits / 2400 b/s = 2.56 s
-   * micro seconds (us) will be 2,560,000
-   *
-   * Now how long will it take us to write those bytes?
-   *
-   *   bytes      10 bits         s
-   * -------- *  --------- * -------------
-   *                           baud_rate
-   *
-   * For example with 9600 baud we have:
-   *
-   * 512 * 10 / 9600 = 0.53 s
-   */
-  double d, d1, d2;
-  uint32_t nbits;
-  nbits = 6.0*bytes;
-  nbits <<= 1;
-
-  d1 = nbits;
-
-  //d /= dev->air_data_rate;
-  d1 /= 2400;
-
-  nbits = 10.0*bytes;
-  d2 = nbits;
-  d2 /= 9200;
-
-  d2 = 0;
-  d = d1 - d2;
-
-  d *= 1e6;
-  return round(d);
-}
-
 static int
 e32_init_gpio(struct options *opts, struct E32 *dev)
 {
@@ -212,17 +163,9 @@ e32_aux_poll(struct E32 *dev)
 
   if(dev->verbose)
     printf("sleeping\n");
-//usleep(10000);
 
-  long d = e32_delay_us(dev, 512);
-  //usleep(d);
-  //sleep(5);
-  usleep(600000);
-
-  if(dev->verbose)
-  {
-    printf("Delaying %ld us\n", d);
-  }
+  // TODO this line has been the biggest source of pain
+  usleep(540000);
 
   if(gpio_aux_val != 1)
     fprintf(stderr, "AUX was low after rising edge?\n");
@@ -781,7 +724,7 @@ e32_poll(struct E32 *dev, struct options *opts)
       bytes = fread(buf, 1, E32_TX_BUF_BYTES, opts->input_file);
 
       if(opts->verbose)
-        printf("writing %d to from file to uart\n", bytes);
+        printf("writing %d bytes from file to uart\n", bytes);
 
       if(e32_transmit(dev, buf, bytes))
       {
