@@ -22,7 +22,6 @@ AC_TYPE_UINT8_T
 # Checks for library functions.
 AC_FUNC_FORK
 AC_FUNC_GETGROUPS
-AC_FUNC_STRNLEN
 AC_CHECK_FUNCS([bzero dup2 gethostbyname socket strerror strncasecmp strstr])
 
 AC_CONFIG_FILES([Makefile

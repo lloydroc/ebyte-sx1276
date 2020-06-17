@@ -4,8 +4,7 @@ void
 usage(char *progname)
 {
   printf("Usage: %s [OPTIONS]\n\n", progname);
-  printf("A command line tool to read data from the ST LSM9DS1.\n");
-  printf("After wiring up the lsm9ds1 you MUST run a configuration on it first.\n\n");
+  printf("A command line tool to interact E32.\n");
   printf("OPTIONS:\n\
 -h --help                     Print help\n\
 -x --reset                    SW Reset\n\
@@ -20,6 +19,7 @@ usage(char *progname)
    --in-file  FILENAME        Read intput from a File\n\
    --out-file FILENAME        Write output to a File\n\
 -u --socket-udp HOST:PORT     Output data to a UDP Socket\n\
+   --socket-unix FILENAME     Send and Receive data from a Unix Domain Socket\n\
 -b --binary                   Used with the -f and -u options for binary output\n\
 -d --daemon                   Run as a Daemon\n\
 ");
@@ -45,6 +45,7 @@ options_init(struct options *opts)
   opts->input_file = NULL;
   opts->output_file = NULL;
   opts->fd_socket_udp = -1;
+  opts->fd_socket_unix = -1;
 }
 
 static int
@@ -137,6 +138,42 @@ options_open_socket_udp(struct options *opts, char *optarg)
   return 0;
 }
 
+static int
+options_open_socket_unix(struct options *opts, char *optarg)
+{
+  socklen_t len;
+
+  opts->fd_socket_unix = socket(AF_UNIX, SOCK_DGRAM, 0);
+  if(opts->fd_socket_unix == -1)
+  {
+    fprintf(stderr, "error opening socket\n");
+    return 1;
+  }
+
+  if(strlen(optarg) > sizeof(opts->socket_unix_server.sun_path)-1)
+  {
+    fprintf(stderr, "socket path too long must be %d chars", sizeof(opts->socket_unix_server.sun_path-1));
+    return 2;
+  }
+
+  if(remove(optarg) == -1 && errno != ENOENT)
+  {
+    fprintf(stderr, "error removing socket %d", errno);
+    return 2;
+  }
+
+  memset(&opts->socket_unix_server, 0, sizeof(struct sockaddr_un));
+  opts->socket_unix_server.sun_family = AF_UNIX;
+  strncpy(opts->socket_unix_server.sun_path, optarg, sizeof(opts->socket_unix_server.sun_path)-1);
+
+  if(bind(opts->fd_socket_unix, (struct sockaddr*) &opts->socket_unix_server, sizeof(struct sockaddr_un)) == -1)
+  {
+    fprintf(stderr, "error binding to socket\n");
+    return 3;
+  }
+  return 0;
+}
+
 int
 options_parse(struct options *opts, int argc, char *argv[])
 {
@@ -158,6 +195,7 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"in-file",            required_argument, 0,   0},
     {"out-file",           required_argument, 0,   0},
     {"socket-udp",         required_argument, 0, 'u'},
+    {"socket-unix",        required_argument, 0,   0},
     {"binary",                   no_argument, 0, 'b'},
     {"deamon",                   no_argument, 0, 'd'},
     {0,                                    0, 0,   0}
@@ -187,6 +225,10 @@ options_parse(struct options *opts, int argc, char *argv[])
       {
         opts->input_file = options_open_file(optarg, "r");
         ret |= opts->input_file == NULL;
+      }
+      else if(strcmp("socket-unix", long_options[option_index].name) == 0)
+      {
+        ret |= options_open_socket_unix(opts, optarg);
       }
       break;
 

@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <sys/un.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -33,6 +34,9 @@ struct options
   FILE* output_file;
   int fd_socket_udp;
   struct sockaddr_in socket_udp_dest;
+  int fd_socket_unix;
+  struct sockaddr_un socket_unix_server;
+  struct sockaddr_un socket_unix_client;
   int binary;
 };
 

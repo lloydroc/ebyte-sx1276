@@ -259,6 +259,10 @@ e32_deinit(struct E32 *dev, struct options* opts)
     ret |= fclose(opts->output_file);
 
   ret |= close(dev->uart_fd);
+
+  if(opts->fd_socket_unix != -1)
+    close(opts->fd_socket_unix);
+
   return ret;
 }
 
@@ -619,9 +623,9 @@ int
 e32_poll(struct E32 *dev, struct options *opts)
 {
   ssize_t bytes;
-  struct pollfd pfd[3];
+  struct pollfd pfd[4];
   int ret;
-  uint8_t buf[513];
+  uint8_t buf[E32_TX_BUF_BYTES+1];
   int loop;
   int tty;
 
@@ -639,6 +643,10 @@ e32_poll(struct E32 *dev, struct options *opts)
   pfd[2].fd = -1;
   pfd[2].events = 0;
 
+  // used for a unix domain socket
+  pfd[3].fd = -1;
+  pfd[3].events = 0;
+
   if(opts->input_standard)
   {
     pfd[0].fd = fileno(stdin);
@@ -651,11 +659,17 @@ e32_poll(struct E32 *dev, struct options *opts)
     pfd[2].events = POLLIN;
   }
 
+  if(opts->fd_socket_unix)
+  {
+    pfd[3].fd = opts->fd_socket_unix;
+    pfd[3].events = POLLIN;
+  }
+
   printf("polling file descriptors\n");
   loop = 1;
   while(loop)
   {
-    ret = poll(pfd, 3, -1);
+    ret = poll(pfd, 4, -1);
     if(ret == 0)
     {
       fprintf(stderr, "poll timed out\n");
@@ -699,7 +713,7 @@ e32_poll(struct E32 *dev, struct options *opts)
       if(opts->verbose)
         printf("reading from uart\n");
 
-      bytes = read(pfd[1].fd, buf, E32_TX_BUF_BYTES);
+      bytes = read(pfd[1].fd, buf, 1);
 
       if(opts->output_file != NULL)
       {
@@ -744,6 +758,34 @@ e32_poll(struct E32 *dev, struct options *opts)
         if(opts->verbose)
           printf("getting out of loop\n");
         loop = 0;
+      }
+    }
+
+    /* received from unix domain socket */
+    if(pfd[3].revents & POLLIN)
+    {
+      size_t len = sizeof(struct sockaddr_un);
+      bytes = recvfrom(pfd[3].fd, buf, E32_TX_BUF_BYTES, 0, (struct sockaddr*) &opts->socket_unix_client, &len);
+
+      if(bytes == -1)
+      {
+        fprintf(stderr, "error receiving from unix domain socket");
+        return 4;
+      }
+
+      if(opts->verbose)
+        printf("received %d bytes from unix domain socket: %s\n", bytes, opts->socket_unix_client.sun_path);
+
+      if(e32_transmit(dev, buf, bytes))
+      {
+        fprintf(stderr, "error in transmit\n");
+        //return 3;
+      }
+
+      if(opts->output_standard)
+      {
+        buf[bytes] = '\0';
+        printf("%s", buf);
       }
     }
   }
