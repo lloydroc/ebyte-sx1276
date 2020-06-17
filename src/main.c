@@ -138,7 +138,9 @@ main(int argc, char *argv[])
   lsm9ds1_ag_poll(&dev, &opts);
 
 */
-  e32_poll(&dev, &opts);
+  ret |= e32_poll(&dev, &opts);
+  if(ret)
+    fprintf(stderr, "error polling %d", ret);
 cleanup:
   ret |= e32_deinit(&dev, &opts);
 

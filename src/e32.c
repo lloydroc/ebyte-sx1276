@@ -1,5 +1,54 @@
 #include "e32.h"
 
+static long
+e32_delay_us(struct E32 *dev, int bytes)
+{
+
+  /*
+   *      s          bytes       8 bits      6 bits FEC
+   * ----------- * --------- * --------- * --------------
+   * air_rate b                   byte         4 bits
+   *
+   * Example:
+   * Air Data Rate =  2.4k
+   * Bytes = 512
+   * FEC: On
+   *
+   * bits we'll send is 512*8*6/4 = 512*2*6 = 6144
+   * seconds is 6144 bits / 2400 b/s = 2.56 s
+   * micro seconds (us) will be 2,560,000
+   *
+   * Now how long will it take us to write those bytes?
+   *
+   *   bytes      10 bits         s
+   * -------- *  --------- * -------------
+   *                           baud_rate
+   *
+   * For example with 9600 baud we have:
+   *
+   * 512 * 10 / 9600 = 0.53 s
+   */
+  double d, d1, d2;
+  uint32_t nbits;
+  nbits = 6.0*bytes;
+  nbits <<= 1;
+
+  d1 = nbits;
+
+  //d /= dev->air_data_rate;
+  d1 /= 2400;
+
+  nbits = 10.0*bytes;
+  d2 = nbits;
+  d2 /= 9200;
+
+  d2 = 0;
+  d = d1 - d2;
+
+  d *= 1e6;
+  return round(d);
+}
+
 static int
 e32_init_gpio(struct options *opts, struct E32 *dev)
 {
@@ -155,14 +204,28 @@ e32_aux_poll(struct E32 *dev)
 
   if(dev->verbose)
     printf("rising edge of AUX found\n");
-  lseek(dev->gpio_aux_fd, 0, SEEK_SET);
+
   gpio_read(dev->gpio_aux_fd, &gpio_aux_val);
+
   if(dev->verbose)
     printf("AUX value is %d\n", gpio_aux_val);
 
   if(dev->verbose)
     printf("sleeping\n");
-  usleep(10000);
+//usleep(10000);
+
+  long d = e32_delay_us(dev, 512);
+  //usleep(d);
+  //sleep(5);
+  usleep(600000);
+
+  if(dev->verbose)
+  {
+    printf("Delaying %ld us\n", d);
+  }
+
+  if(gpio_aux_val != 1)
+    fprintf(stderr, "AUX was low after rising edge?\n");
 
   return gpio_aux_val != 1;
 }
@@ -180,7 +243,8 @@ e32_set_mode(struct E32 *dev, int mode)
 
   if(dev->mode == mode)
   {
-    printf("mode %d unchanged\n", mode);
+    if(dev->verbose)
+      printf("mode %d unchanged\n", mode);
     return 0;
   }
 
@@ -198,7 +262,9 @@ e32_set_mode(struct E32 *dev, int mode)
   else
     return ret;
 
-  printf("new mode %d, prev mode is %d\n", mode, dev->prev_mode);
+  if(dev->verbose)
+    printf("new mode %d, prev mode is %d\n", mode, dev->prev_mode);
+
   if(dev->prev_mode == 3 && dev->mode != 3)
   {
     if(e32_aux_poll(dev))
@@ -217,7 +283,6 @@ e32_get_mode(struct E32 *dev)
 
   int m0, m1;
 
-  puts("reading mode pins");
   ret  = gpio_read(dev->gpio_m0_fd, &m0) != 2;
   ret |= gpio_read(dev->gpio_m1_fd, &m1) != 2;
 
@@ -227,7 +292,9 @@ e32_get_mode(struct E32 *dev)
   m1 <<= 1;
   dev->mode = m0+m1;
 
-  printf("got mode %d\n", dev->mode);
+  if(dev->verbose)
+    printf("read mode %d\n", dev->mode);
+
   return ret;
 }
 
@@ -252,42 +319,43 @@ e32_deinit(struct E32 *dev, struct options* opts)
   return ret;
 }
 
-
 int
 e32_cmd_read_settings(struct E32 *dev)
 {
   ssize_t bytes;
   const uint8_t cmd[3] = {0xC1, 0xC1, 0xC1};
-  uint8_t buf[6];
   uint8_t *buf_ptr;
-  puts("writing settings command");
+
+  if(dev->verbose)
+    puts("writing settings command");
+
   bytes = write(dev->uart_fd, cmd, 3);
   if(bytes == -1)
    return -1;
 
-  puts("reading settings command");
+  if(dev->verbose)
+    puts("reading settings command");
+
   bytes = 0;
-  buf_ptr = buf;
+  buf_ptr = dev->settings;
   do
   {
-    bytes += read(dev->uart_fd, buf_ptr++, 1);
-    printf("bytes %d\n", bytes);
+    bytes += read(dev->uart_fd, buf_ptr, 1);
+    buf_ptr += (bytes != 0);
     if(bytes == -1)
       return -1;
   }
   while(bytes < 6);
 
-  printf("bytes %d.\n", bytes);
-
-  if(buf[0] != 0xC0 && buf[0] != 0xC2)
+  if(dev->settings[0] != 0xC0 && dev->settings[0] != 0xC2)
     return -2;
 
-  dev->power_down_save = buf[0] == 0xC0;
-  dev->addh = buf[1];
-  dev->addl = buf[2];
-  dev->parity = buf[3] & 0b11000000;
+  dev->power_down_save = dev->settings[0] == 0xC0;
+  dev->addh = dev->settings[1];
+  dev->addl = dev->settings[2];
+  dev->parity = dev->settings[3] & 0b11000000;
   dev->parity >>= 6;
-  dev->uart_baud = buf[3] & 0b00111000;
+  dev->uart_baud = dev->settings[3] & 0b00111000;
   dev->uart_baud >>= 3;
   switch(dev->uart_baud)
   {
@@ -296,6 +364,9 @@ e32_cmd_read_settings(struct E32 *dev)
       break;
     case 1:
       dev->uart_baud = 2400;
+      break;
+    case 2:
+      dev->uart_baud = 4800;
       break;
     case 3:
       dev->uart_baud = 9600;
@@ -316,7 +387,7 @@ e32_cmd_read_settings(struct E32 *dev)
       dev->uart_baud = 0;
   }
 
-  dev->air_data_rate = buf[3] & 0b00000111;
+  dev->air_data_rate = dev->settings[3] & 0b00000111;
   switch(dev->air_data_rate)
   {
     case 0:
@@ -345,17 +416,17 @@ e32_cmd_read_settings(struct E32 *dev)
       dev->air_data_rate = 0;
   }
 
-  dev->channel = buf[4] & 0b11100000;
+  dev->channel = dev->settings[4] & 0b11100000;
   dev->channel >>= 5;
   dev->channel += 410;
 
-  dev->transmission_mode = buf[5] & 0b10000000;
+  dev->transmission_mode = dev->settings[5] & 0b10000000;
   dev->transmission_mode >>= 7;
 
-  dev->io_drive = buf[5] & 0b01000000;
+  dev->io_drive = dev->settings[5] & 0b01000000;
   dev->io_drive >>= 6;
 
-  dev->wireless_wakeup_time = buf[5] & 0b00111000;
+  dev->wireless_wakeup_time = dev->settings[5] & 0b00111000;
   dev->wireless_wakeup_time >>= 5;
 
   switch(dev->wireless_wakeup_time)
@@ -388,10 +459,10 @@ e32_cmd_read_settings(struct E32 *dev)
       dev->wireless_wakeup_time = 0;
   }
 
-  dev->fec = buf[5] & 0b00000100;
+  dev->fec = dev->settings[5] & 0b00000100;
   dev->fec >>= 2;
 
-  dev->tx_power_dbm = buf[5] & 0b00000011;
+  dev->tx_power_dbm = dev->settings[5] & 0b00000011;
   switch(dev->tx_power_dbm)
   {
     case 0:
@@ -419,6 +490,10 @@ e32_cmd_read_settings(struct E32 *dev)
 void
 e32_print_settings(struct E32 *dev)
 {
+  printf("Settings Raw Value:       0x");
+  for(int i=0; i<6; i++) printf("%02x", dev->settings[i]);
+  puts("");
+
   if(dev->power_down_save)
     printf("Power Down Save:          Save parameters on power down\n");
   else
@@ -480,28 +555,36 @@ e32_cmd_read_version(struct E32 *dev)
 {
   ssize_t bytes;
   const uint8_t cmd[3] = {0xC3, 0xC3, 0xC3};
-  uint8_t ver_buf[4];
   uint8_t *buf;
-  puts("writing version command");
+
+  if(dev->verbose)
+    puts("writing version command");
+
   bytes = write(dev->uart_fd, cmd, 3);
   if(bytes == -1)
    return -1;
 
-  puts("reading version");
+  if(dev->verbose)
+    puts("reading version");
+
   bytes = 0;
-  buf = ver_buf;
+  buf = dev->version;
   do
   {
-    bytes += read(dev->uart_fd, buf++, 1);
-    printf("bytes %d\n", bytes);
+    bytes += read(dev->uart_fd, buf, 1);
+    buf += (bytes != 0);
+    if(bytes == -1)
+      return -1;
   }
   while(bytes < 4);
 
-  printf("bytes %d.\n", bytes);
-  if(ver_buf[0] != 0xC3)
+  if(dev->version[0] != 0xC3)
+  {
+    fprintf(stderr, "mismatch 0x%02x != 0xc3\n", dev->version[0]);
     return -1;
+  }
 
-  switch(ver_buf[1])
+  switch(dev->version[1])
   {
     case 0x32:
       dev->frequency_mhz = 433;
@@ -522,8 +605,8 @@ e32_cmd_read_version(struct E32 *dev)
       dev->frequency_mhz = 0;
   }
 
-  dev->version = ver_buf[2];
-  dev->features = ver_buf[3];
+  dev->ver = dev->version[2];
+  dev->features = dev->version[3];
 
   if(e32_aux_poll(dev))
     return 2;
@@ -534,8 +617,12 @@ e32_cmd_read_version(struct E32 *dev)
 void
 e32_print_version(struct E32 *dev)
 {
+  printf("Version Raw Value:        0x");
+  for(int i=0;i<4;i++)
+    printf("%02x", dev->version[i]);
+  puts("");
   printf("Frequency:                %d MHz\n", dev->frequency_mhz);
-  printf("Version:                  %d\n", dev->version);
+  printf("Version:                  %d\n", dev->ver);
   printf("Features:                 0x%02x\n", dev->features);
 }
 
@@ -562,7 +649,13 @@ e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len)
 {
   ssize_t bytes;
   bytes = write(dev->uart_fd, buf, buf_len);
-  if(bytes != buf_len)
+  if(bytes == -1)
+  {
+    printf("here\n");
+    err_output("writing to e32 uart\n");
+    return -1;
+  }
+  else if(bytes != buf_len)
   {
     printf("wrote only %d of %d\n", bytes, buf_len);
     return bytes;
@@ -586,7 +679,6 @@ e32_poll(struct E32 *dev, struct options *opts)
   struct pollfd pfd[3];
   int ret;
   uint8_t buf[513];
-  uint8_t *buf_ptr;
   int loop;
   int tty;
 
@@ -632,30 +724,31 @@ e32_poll(struct E32 *dev, struct options *opts)
       return 2;
     }
 
+    /* stdin or pipe */
     if(pfd[0].revents & POLLIN)
     {
       pfd[0].revents ^= POLLIN;
 
       printf("reading from fd %d\n", pfd[0].fd);
-      bytes = read(pfd[0].fd, &buf, 512);
+      bytes = read(pfd[0].fd, &buf, E32_TX_BUF_BYTES);
       printf("got %d bytes\n", bytes);
 
       printf("writing to uart\n");
       ret = e32_transmit(dev, buf, bytes);
       if(ret)
       {
-        printf("error transmitting %d\n", ret);
         return 3;
       }
 
       /* sent input through a pipe */
-      if(!tty && bytes < 512)
+      if(!tty && bytes < E32_TX_BUF_BYTES)
       {
         printf("getting out of loop\n");
         loop = 0;
       }
     }
 
+    /* uart for e32 */
     if(pfd[1].revents & POLLIN)
     {
       pfd[1].revents ^= POLLIN;
@@ -663,7 +756,7 @@ e32_poll(struct E32 *dev, struct options *opts)
       if(opts->verbose)
         printf("reading from uart\n");
 
-      bytes = read(pfd[1].fd, buf, 512);
+      bytes = read(pfd[1].fd, buf, E32_TX_BUF_BYTES);
 
       if(opts->output_file != NULL)
       {
@@ -677,6 +770,7 @@ e32_poll(struct E32 *dev, struct options *opts)
       }
     }
 
+    /* user specified file */
     if(pfd[2].revents & POLLIN)
     {
       pfd[2].revents ^= POLLIN;
@@ -684,24 +778,28 @@ e32_poll(struct E32 *dev, struct options *opts)
       if(opts->verbose)
         printf("reading from fd %d\n", pfd[2].fd);
 
-      bytes = fread(buf, 1, 512, opts->input_file);
+      bytes = fread(buf, 1, E32_TX_BUF_BYTES, opts->input_file);
 
       if(opts->verbose)
         printf("writing %d to from file to uart\n", bytes);
 
       if(e32_transmit(dev, buf, bytes))
-        return 3;
+      {
+        fprintf(stderr, "error in transmit\n");
+        //return 3;
+      }
 
       if(opts->output_standard)
       {
-        buf[bytes+1] = '\0';
+        buf[bytes] = '\0';
         printf("%s", buf);
       }
 
       /* all bytes read from file */
-      if(bytes < 512)
+      if(bytes < E32_TX_BUF_BYTES)
       {
-        printf("getting out of loop\n");
+        if(opts->verbose)
+          printf("getting out of loop\n");
         loop = 0;
       }
     }

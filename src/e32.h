@@ -3,9 +3,12 @@
 
 #include <poll.h>
 #include <sys/time.h>
+#include <math.h>
 #include "options.h"
 #include "gpio.h"
 #include "uart.h"
+
+#define E32_TX_BUF_BYTES 58
 
 struct E32
 {
@@ -16,8 +19,10 @@ struct E32
   int uart_fd;
   int prev_mode;
   int mode;
+  uint8_t version[4];
+  uint8_t settings[6];
   int frequency_mhz;
-  int version;
+  int ver;
   int features;
   int power_down_save;
   int addh;

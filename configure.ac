@@ -10,12 +10,20 @@ AC_PROG_INSTALL
 # Checks for libraries.
 
 # Checks for header files.
-# AC_CHECK_HEADERS([arpa/inet.h netinet/in.h strings.h sys/socket.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stdint.h stdlib.h string.h sys/socket.h sys/time.h termios.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
+AC_CHECK_HEADER_STDBOOL
+AC_TYPE_UID_T
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+AC_TYPE_UINT8_T
 
 # Checks for library functions.
-# AC_CHECK_FUNCS([bzero socket])
+AC_FUNC_FORK
+AC_FUNC_GETGROUPS
+AC_FUNC_STRNLEN
+AC_CHECK_FUNCS([bzero dup2 gethostbyname socket strerror strncasecmp strstr])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile])
