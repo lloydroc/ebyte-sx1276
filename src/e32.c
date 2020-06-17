@@ -710,9 +710,6 @@ e32_poll(struct E32 *dev, struct options *opts)
     {
       pfd[1].revents ^= POLLIN;
 
-      if(opts->verbose)
-        printf("reading from uart\n");
-
       bytes = read(pfd[1].fd, buf, 1);
 
       if(opts->output_file != NULL)
@@ -764,6 +761,8 @@ e32_poll(struct E32 *dev, struct options *opts)
     /* received from unix domain socket */
     if(pfd[3].revents & POLLIN)
     {
+      pfd[3].revents ^= POLLIN;
+
       size_t len = sizeof(struct sockaddr_un);
       bytes = recvfrom(pfd[3].fd, buf, E32_TX_BUF_BYTES, 0, (struct sockaddr*) &opts->socket_unix_client, &len);
 
