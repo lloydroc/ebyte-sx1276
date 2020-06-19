@@ -752,7 +752,7 @@ e32_poll(struct E32 *dev, struct options *opts)
       }
 
       // TODO we send a single byte at a time
-      for(int i=0; i< list_size(dev->socket_list); i++)
+      for(int i=0; i<list_size(dev->socket_list); i++)
       {
         struct sockaddr_un *cl;
         cl = list_get_index(dev->socket_list, i);

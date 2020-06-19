@@ -89,55 +89,11 @@ main(int argc, char *argv[])
     e32_print_settings(&dev);
     goto cleanup;
   }
-
-  /*if(lsm9ds1_configure_ag_interrupt(opts.gpio_interrupt_ag, &fd))
-  {
-    fprintf(stderr, "unable to configure interrupt %d\n", opts.gpio_interrupt_ag);
-    return EXIT_FAILURE;
-  }*/
-
-/*
-  lsm9ds1_init(&dev);
-
-  if(opts.reset)
-  {
-    lsm9ds1_reset(&dev);
-    ret = EXIT_SUCCESS;
-    goto cleanup;
-  }
-  else if(opts.configure)
-  {
-    lsm9ds1_configure(&dev);
-    ret = lsm9ds1_test(&dev);
-    goto cleanup;
-  }
   else if(opts.daemon)
   {
-    if(opts.data_file == stdout)
-      opts.data_file = NULL;
     become_daemon();
   }
 
-  ret = lsm9ds1_test(&dev);
-  if(ret)
-  {
-    fprintf(stderr, "Failed %d test cases\n", ret);
-    ret = EXIT_FAILURE;
-    goto cleanup;
-  }
-  else
-  {
-    // skip test since we did it above
-    if(opts.test)
-    {
-      ret = EXIT_SUCCESS;
-      goto cleanup;
-    }
-  }
-
-  lsm9ds1_ag_poll(&dev, &opts);
-
-*/
   ret |= e32_poll(&dev, &opts);
   if(ret)
     fprintf(stderr, "error polling %d", ret);

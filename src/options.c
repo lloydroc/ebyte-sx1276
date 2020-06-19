@@ -7,7 +7,7 @@ usage(char *progname)
   printf("A command line tool to interact E32.\n");
   printf("OPTIONS:\n\
 -h --help                     Print help\n\
--x --reset                    SW Reset\n\
+-r --reset                    SW Reset\n\
 -t --test                     Perform a test\n\
 -c --configure                Write Configuration\n\
 -v --verbose                  Verbose Output\n\
@@ -19,7 +19,7 @@ usage(char *progname)
    --in-file  FILENAME        Read intput from a File\n\
    --out-file FILENAME        Write output to a File\n\
 -u --socket-udp HOST:PORT     Output data to a UDP Socket\n\
-   --socket-unix FILENAME     Send and Receive data from a Unix Domain Socket\n\
+-x --socket-unix FILENAME     Send and Receive data from a Unix Domain Socket\n\
 -b --binary                   Used with the -f and -u options for binary output\n\
 -d --daemon                   Run as a Daemon\n\
 ");
@@ -193,7 +193,7 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"in-file",            required_argument, 0,   0},
     {"out-file",           required_argument, 0,   0},
     {"socket-udp",         required_argument, 0, 'u'},
-    {"socket-unix",        required_argument, 0,   0},
+    {"socket-unix",        required_argument, 0, 'x'},
     {"binary",                   no_argument, 0, 'b'},
     {"deamon",                   no_argument, 0, 'd'},
     {0,                                    0, 0,   0}
@@ -202,7 +202,7 @@ options_parse(struct options *opts, int argc, char *argv[])
   while(1)
   {
     option_index = 0;
-    c = getopt_long(argc, argv, "hxtvcsm:u:f:bd", long_options, &option_index);
+    c = getopt_long(argc, argv, "hrtvcsm:u:f:bdx:", long_options, &option_index);
 
     if(c == -1)
       break;
@@ -224,16 +224,12 @@ options_parse(struct options *opts, int argc, char *argv[])
         opts->input_file = options_open_file(optarg, "r");
         ret |= opts->input_file == NULL;
       }
-      else if(strcmp("socket-unix", long_options[option_index].name) == 0)
-      {
-        ret |= options_open_socket_unix(opts, optarg);
-      }
       break;
 
       case 'h':
         opts->help = 1;
         break;
-      case 'x':
+      case 'r':
         opts->reset = 1;
         break;
       case 't':
@@ -255,6 +251,9 @@ options_parse(struct options *opts, int argc, char *argv[])
         break;
       case 'u':
         ret |= options_open_socket_udp(opts, optarg);
+        break;
+      case 'x':
+        ret |= options_open_socket_unix(opts, optarg);
         break;
       case 'b':
         opts->binary = 1;
