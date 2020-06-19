@@ -692,7 +692,7 @@ e32_poll(struct E32 *dev, struct options *opts)
     pfd[3].events = POLLIN;
   }
 
-  printf("polling file descriptors\n");
+  printf("waiting for input\n");
   loop = 1;
   while(loop)
   {
@@ -759,7 +759,10 @@ e32_poll(struct E32 *dev, struct options *opts)
         addrlen = sizeof(struct sockaddr_un);
         bytes = sendto(pfd[3].fd, buf, bytes, 0, (struct sockaddr*) cl, addrlen);
         if(bytes == -1)
+        {
           err_output("unable to send back status to unix socket");
+          list_remove(dev->socket_list, cl);
+        }
       }
       // TODO write to udp
     }
@@ -820,7 +823,6 @@ e32_poll(struct E32 *dev, struct options *opts)
 
       if(opts->verbose)
         printf("received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
-
 
       /* if not in the list add them */
       if(bytes == 0 && list_index_of(dev->socket_list, &client))
