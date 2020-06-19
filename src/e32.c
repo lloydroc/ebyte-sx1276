@@ -748,17 +748,20 @@ e32_poll(struct E32 *dev, struct options *opts)
       {
         buf[bytes] = '\0';
         printf("%s", buf);
+        fflush(stdout);
       }
 
+      // TODO we send a single byte at a time
       for(int i=0; i< list_size(dev->socket_list); i++)
       {
         struct sockaddr_un *cl;
         cl = list_get_index(dev->socket_list, i);
         addrlen = sizeof(struct sockaddr_un);
-        bytes = sendto(pfd[3].fd, buf, bytes, 0, (struct sockaddr*) &cl, addrlen);
+        bytes = sendto(pfd[3].fd, buf, bytes, 0, (struct sockaddr*) cl, addrlen);
         if(bytes == -1)
-          err_output("unable so send back status to unix socket");
+          err_output("unable to send back status to unix socket");
       }
+      // TODO write to udp
     }
 
     /* user specified file */
@@ -843,7 +846,7 @@ e32_poll(struct E32 *dev, struct options *opts)
       {
         bytes = sendto(pfd[3].fd, &clret, 1, 0, (struct sockaddr*) &client, addrlen);
         if(bytes == -1)
-          err_output("unable so send back status to unix socket");
+          err_output("unable to send back status to unix socket");
           continue;
       }
 
