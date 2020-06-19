@@ -7,6 +7,7 @@
 #include "options.h"
 #include "gpio.h"
 #include "uart.h"
+#include "list.h"
 
 #define E32_TX_BUF_BYTES 58
 
@@ -37,6 +38,7 @@ struct E32
   int wireless_wakeup_time;
   int fec;
   int tx_power_dbm;
+  struct List *socket_list;
 };
 
 enum E32_mode

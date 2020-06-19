@@ -97,6 +97,24 @@ e32_init_uart(struct E32 *dev)
   return dev->uart_fd;
 }
 
+static int
+socket_match(void *a, void *b)
+{
+  struct sockaddr_un *socka;
+  struct sockaddr_un *sockb;
+
+  socka = (struct sockaddr_un*) a;
+  sockb = (struct sockaddr_un*) b;
+
+  return strcmp(socka->sun_path, sockb->sun_path);
+}
+
+static void
+socket_free(void *socket)
+{
+  free(socket);
+}
+
 int
 e32_init(struct E32 *dev, struct options *opts)
 {
@@ -113,6 +131,9 @@ e32_init(struct E32 *dev, struct options *opts)
 
   dev->verbose = opts->verbose;
   dev->prev_mode = -1;
+
+  dev->socket_list = calloc(1, sizeof(struct List));
+  list_init(dev->socket_list, socket_match, socket_free);
 
   return 0;
 }
@@ -262,6 +283,9 @@ e32_deinit(struct E32 *dev, struct options* opts)
 
   if(opts->fd_socket_unix != -1)
     close(opts->fd_socket_unix);
+
+  list_destroy(dev->socket_list);
+  free(dev->socket_list);
 
   return ret;
 }
@@ -628,6 +652,9 @@ e32_poll(struct E32 *dev, struct options *opts)
   uint8_t buf[E32_TX_BUF_BYTES+1];
   int loop;
   int tty;
+  uint8_t clret; // return to socket clients
+  struct sockaddr_un client;
+  socklen_t addrlen; // unix domain socket client address
 
   tty = isatty(fileno(stdin));
 
@@ -722,6 +749,16 @@ e32_poll(struct E32 *dev, struct options *opts)
         buf[bytes] = '\0';
         printf("%s", buf);
       }
+
+      for(int i=0; i< list_size(dev->socket_list); i++)
+      {
+        struct sockaddr_un *cl;
+        cl = list_get_index(dev->socket_list, i);
+        addrlen = sizeof(struct sockaddr_un);
+        bytes = sendto(pfd[3].fd, buf, bytes, 0, (struct sockaddr*) &cl, addrlen);
+        if(bytes == -1)
+          err_output("unable so send back status to unix socket");
+      }
     }
 
     /* user specified file */
@@ -762,30 +799,70 @@ e32_poll(struct E32 *dev, struct options *opts)
     if(pfd[3].revents & POLLIN)
     {
       pfd[3].revents ^= POLLIN;
+      clret = 0;
+      addrlen = sizeof(struct sockaddr_un);
 
-      size_t len = sizeof(struct sockaddr_un);
-      bytes = recvfrom(pfd[3].fd, buf, E32_TX_BUF_BYTES, 0, (struct sockaddr*) &opts->socket_unix_client, &len);
-
+      bytes = recvfrom(pfd[3].fd, buf, E32_TX_BUF_BYTES, 0, (struct sockaddr*) &client, &addrlen);
       if(bytes == -1)
       {
-        fprintf(stderr, "error receiving from unix domain socket");
-        return 4;
+        err_output("error receiving from unix domain socket");
+        continue;
+      }
+      else if(bytes > E32_TX_BUF_BYTES)
+      {
+        fprintf(stderr, "overflow: datagram truncated to %d bytes", E32_TX_BUF_BYTES);
+        bytes = E32_TX_BUF_BYTES;
+        clret++;
       }
 
       if(opts->verbose)
-        printf("received %d bytes from unix domain socket: %s\n", bytes, opts->socket_unix_client.sun_path);
+        printf("received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
+
+
+      /* if not in the list add them */
+      if(bytes == 0 && list_index_of(dev->socket_list, &client))
+      {
+        if(opts->verbose)
+          printf("adding client %d at %s\n", list_size(dev->socket_list), client.sun_path);
+
+        struct sockaddr_un *new_client;
+        new_client = malloc(sizeof(struct sockaddr_un));
+        memcpy(new_client, &client, sizeof(struct sockaddr_un));
+        list_add_first(dev->socket_list, new_client);
+      }
+      else if(bytes == 0)
+      {
+        if(opts->verbose)
+          printf("removing client at %s\n", client.sun_path);
+
+        list_remove(dev->socket_list, &client);
+      }
+
+      /* sending 0 bytes will register or de-register */
+      if(bytes == 0)
+      {
+        bytes = sendto(pfd[3].fd, &clret, 1, 0, (struct sockaddr*) &client, addrlen);
+        if(bytes == -1)
+          err_output("unable so send back status to unix socket");
+          continue;
+      }
 
       if(e32_transmit(dev, buf, bytes))
       {
         fprintf(stderr, "error in transmit\n");
-        //return 3;
+        clret++;
       }
 
       if(opts->output_standard)
       {
         buf[bytes] = '\0';
         printf("%s", buf);
+        fflush(stdout);
       }
+
+      bytes = sendto(pfd[3].fd, &clret, 1, 0, (struct sockaddr*) &client, addrlen);
+      if(bytes == -1)
+        err_output("unable to send back status to unix socket");
     }
   }
 

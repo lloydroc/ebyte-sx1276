@@ -36,7 +36,6 @@ struct options
   struct sockaddr_in socket_udp_dest;
   int fd_socket_unix;
   struct sockaddr_un socket_unix_server;
-  struct sockaddr_un socket_unix_client;
   int binary;
 };
 

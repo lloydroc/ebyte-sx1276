@@ -141,8 +141,6 @@ options_open_socket_udp(struct options *opts, char *optarg)
 static int
 options_open_socket_unix(struct options *opts, char *optarg)
 {
-  socklen_t len;
-
   opts->fd_socket_unix = socket(AF_UNIX, SOCK_DGRAM, 0);
   if(opts->fd_socket_unix == -1)
   {
