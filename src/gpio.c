@@ -21,7 +21,7 @@ gpio_permissions_valid()
 
     ret = stat(GPIO_EXPORT_PATH, &statbuf);
     if(ret)
-        err_output("unable to GPIO on %s\n", GPIO_EXPORT_PATH);
+        errno_output("unable to GPIO on %s\n", GPIO_EXPORT_PATH);
 
     for(int i=0;i<ngroups;i++)
     {
@@ -70,7 +70,7 @@ gpio_get_exports(int inputs[], int outputs[], int *num_inputs, int *num_outputs)
     n = scandir(GPIO_PATH, &exports, filter, alphasort);
     if(n == -1)
     {
-        err_output("unable to list directory %s", GPIO_PATH);
+        errno_output("unable to list directory %s", GPIO_PATH);
         return n;
     }
 
@@ -121,15 +121,14 @@ gpio_export(int gpio)
     fd = open(path, O_WRONLY);
     if(fd == -1)
     {
-        fprintf(stderr, "Exception exporting GPIO %d", gpio);
-        perror("GPIO: Unable to open");
+        errno_output("Exception exporting GPIO %d", gpio);
         close(fd);
         return -1;
     }
 
     if(write(fd, val, strlen(val)) < 0)
     {
-        perror("GPIO: Unable to set output");
+        errno_output("GPIO: Unable to set output");
         close(fd);
         return -1;
     }
@@ -161,7 +160,7 @@ gpio_check_permissions_bug(char *path)
     ret = stat(path, &statbuf);
     if(ret)
     {
-        err_output("unable to stat %s\n", path);
+        errno_output("unable to stat %s\n", path);
     }
 
     if(uid == statbuf.st_uid && (statbuf.st_mode & S_IWUSR))
@@ -196,7 +195,7 @@ gpio_get_direction(int gpio, int *input)
     dir = fopen(path, "r");
     if(dir == NULL)
     {
-        err_output("Exception opening %s\n", path);
+        errno_output("Exception opening %s\n", path);
         fclose(dir);
         return -1;
     }
@@ -240,14 +239,14 @@ gpio_set_direction(int gpio, int input)
     fd = open(path, O_WRONLY);
     if(fd == -1)
     {
-        err_output("Exception opening %s\n", path);
+        errno_output("Exception opening %s\n", path);
         close(fd);
         return -1;
     }
 
     if(write(fd, val, strlen(val)) < 0)
     {
-        err_output("GPIO: Unable to set direction");
+        errno_output("GPIO: Unable to set direction");
         close(fd);
         return -1;
     }
@@ -267,11 +266,11 @@ gpio_open(int gpio)
 
     if(fd == -1)
     {
-        err_output("Exception opening %s will retry\n", path);
+        errno_output("Exception opening %s will retry\n", path);
         fd = gpio_check_permissions_bug(path);
         fd = open(path, O_RDWR);
         if(fd == -1)
-          err_output("Exception opening %s\n", path);
+          errno_output("Exception opening %s\n", path);
     }
     return fd;
 }
@@ -302,14 +301,14 @@ gpio_set_edge(int gpio, int edge)
     fd = open(path, O_WRONLY);
     if(fd == -1)
     {
-        err_output("Exception opening %s\n", path);
+        errno_output("Exception opening %s\n", path);
         close(fd);
         return -1;
     }
 
     if(write(fd, val, strlen(val))<0)
     {
-        err_output("GPIO: Unable to set edge");
+        errno_output("GPIO: Unable to set edge");
         close(fd);
         return -1;
     }
@@ -334,7 +333,7 @@ gpio_get_edge(int gpio, int *edge)
     dir = fopen(path, "r");
     if(dir == NULL)
     {
-        err_output("Exception opening %s\n", path);
+        errno_output("Exception opening %s\n", path);
         fclose(dir);
         return -1;
     }
@@ -365,7 +364,7 @@ gpio_close(int fd)
     ret = close(fd);
     if(fd == -1)
     {
-        err_output("Exception closing %d\n", fd);
+        errno_output("Exception closing %d\n", fd);
     }
     return ret;
 }
@@ -377,7 +376,7 @@ gpio_write(int fd, int val)
     sprintf(cval, "%d", val);
     int ret = write(fd, cval, strlen(cval));
     if(ret<0)
-        perror("GPIO: unable to perform gpio write");
+        errno_output("GPIO: unable to perform gpio write");
     return ret;
 }
 
@@ -388,9 +387,12 @@ gpio_read(int fd, int *val)
     int ret;
     lseek(fd, 0, SEEK_SET);
     ret = read(fd, cval, 2);
-    if(ret != 2)
+    if(ret == -1)
+        errno_output("GPIO: unable to perform gpio read got %d bytes", ret);
+    else if(ret != 2)
         err_output("GPIO: unable to perform gpio read got %d bytes", ret);
-    *val = cval[0]-48;
+    else
+        *val = cval[0]-48;
     return ret;
 }
 
@@ -408,13 +410,13 @@ gpio_unexport(int gpio)
     fd = open(path, O_WRONLY);
     if(fd == -1)
     {
-      fprintf(stderr, "Exception unexporting GPIO %s %s", path, val);
+      errno_output("Exception unexporting GPIO %s %s", path, val);
       return -1;
     }
 
     if(write(fd, val, strlen(val)) < 0)
     {
-      err_output("GPIO: Unable to unexport %s %s", path, val);
+      errno_output("GPIO: Unable to unexport %s %s", path, val);
       return -1;
     }
 

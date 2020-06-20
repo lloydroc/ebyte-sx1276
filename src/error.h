@@ -9,12 +9,23 @@
 #include <string.h>
 #include <unistd.h>
 
+// use the extern use_syslog variable to print to stdout/stderr or syslog
+#include "options.h"
 #define MAX_ENAME 106
+
+void
+info_output(const char *format, ...);
+
+void
+debug_output(const char *format, ...);
+
+void
+warn_output(const char *format, ...);
 
 void
 err_output(const char *format, ...);
 
 void
-err_exit(const char *format, ...);
+errno_output(const char *format, ...);
 
 #endif

@@ -1,18 +1,21 @@
 #ifndef OPTIONS_H
 #define OPTIONS_H
+#include <arpa/inet.h>
+#include <getopt.h>
+#include <netinet/in.h>
+#include <netdb.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <getopt.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <sys/un.h>
+#include <syslog.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
 #include "error.h"
+
+extern int use_syslog;
 
 struct options
 {
@@ -44,6 +47,9 @@ usage(char *progname);
 
 void
 options_init(struct options *opts);
+
+int
+options_deinit(struct options *opts);
 
 int
 options_parse(struct options *opts, int argc, char *argv[]);

@@ -1,5 +1,8 @@
 #include "options.h"
 
+// tells error.c when we print to use stdout, stderr, or syslog
+int use_syslog = 0;
+
 void
 usage(char *progname)
 {
@@ -48,6 +51,21 @@ options_init(struct options *opts)
   opts->fd_socket_unix = -1;
 }
 
+int
+options_deinit(struct options *opts)
+{
+  int ret;
+  ret = 0;
+  if(opts->daemon)
+    closelog();
+
+  if(opts->output_file)
+    ret |= fclose(opts->output_file);
+
+  if(opts->fd_socket_unix != -1)
+    close(opts->fd_socket_unix);
+}
+
 static int
 options_get_mode(char *optarg)
 {
@@ -69,7 +87,7 @@ options_open_file(char *optarg, char *mode)
   FILE* file = fopen(optarg, mode);
   if(file == NULL)
   {
-    err_output("unable to open file %s", optarg);
+    errno_output("unable to open file %s", optarg);
   }
   return file;
 }
@@ -110,9 +128,10 @@ options_open_socket_udp(struct options *opts, char *optarg)
   if(len == 0 || len == 1024)
     return 1;
 
-  if ( (he = gethostbyname(host) ) == NULL ) {
-      err_output("gethostbyname");
-      return 1;
+  if( (he = gethostbyname(host) ) == NULL ) {
+    // TODO this sets h_errno not errno
+    err_output("gethostbyname");
+    return 1;
   }
 
   bzero(&opts->socket_udp_dest, sizeof(struct sockaddr_in));
@@ -123,13 +142,13 @@ options_open_socket_udp(struct options *opts, char *optarg)
   sockfd = socket(opts->socket_udp_dest.sin_family, SOCK_DGRAM, 0);
   if(sockfd == -1)
   {
-    err_output("socket");
+    errno_output("socket");
   }
 
   rc = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
   if(rc)
   {
-    err_output("setsockopt");
+    errno_output("setsockopt");
     return 1;
   }
 
@@ -144,19 +163,19 @@ options_open_socket_unix(struct options *opts, char *optarg)
   opts->fd_socket_unix = socket(AF_UNIX, SOCK_DGRAM, 0);
   if(opts->fd_socket_unix == -1)
   {
-    fprintf(stderr, "error opening socket\n");
+    errno_output("error opening socket\n");
     return 1;
   }
 
   if(strlen(optarg) > sizeof(opts->socket_unix_server.sun_path)-1)
   {
-    fprintf(stderr, "socket path too long must be %d chars", sizeof(opts->socket_unix_server.sun_path-1));
+    err_output("socket path too long must be %d chars\n", sizeof(opts->socket_unix_server.sun_path-1));
     return 2;
   }
 
   if(remove(optarg) == -1 && errno != ENOENT)
   {
-    fprintf(stderr, "error removing socket %d", errno);
+    errno_output("error removing socket\n");
     return 2;
   }
 
@@ -166,7 +185,7 @@ options_open_socket_unix(struct options *opts, char *optarg)
 
   if(bind(opts->fd_socket_unix, (struct sockaddr*) &opts->socket_unix_server, sizeof(struct sockaddr_un)) == -1)
   {
-    fprintf(stderr, "error binding to socket\n");
+    errno_output("error binding to socket\n");
     return 3;
   }
   return 0;
@@ -178,6 +197,15 @@ options_parse(struct options *opts, int argc, char *argv[])
   int c;
   int option_index;
   int ret = 0;
+#define BUF 128
+  char infile[BUF];
+  char outfile[BUF];
+  char sockunix[BUF];
+
+  infile[0] = '\0';
+  outfile[0] = '\0';
+  sockunix[0] = '\0';
+
   static struct option long_options[] =
   {
     {"help",                     no_argument, 0, 'h'},
@@ -215,59 +243,72 @@ options_parse(struct options *opts, int argc, char *argv[])
       else if(strcmp("aux", long_options[option_index].name) == 0)
         opts->gpio_aux = atoi(optarg);
       else if(strcmp("out-file", long_options[option_index].name) == 0)
-      {
-        opts->output_file = options_open_file(optarg, "w");
-        ret |= opts->output_file == NULL;
-      }
+        strncpy(outfile, optarg, BUF);
       else if(strcmp("in-file", long_options[option_index].name) == 0)
-      {
-        opts->input_file = options_open_file(optarg, "r");
-        ret |= opts->input_file == NULL;
-      }
+        strncpy(infile, optarg, BUF);
       break;
-
-      case 'h':
-        opts->help = 1;
-        break;
-      case 'r':
-        opts->reset = 1;
-        break;
-      case 't':
-        opts->test = 1;
-        break;
-      case 'v':
-        opts->verbose = 1;
-        break;
-      case 'c':
-        opts->configure = 1;
-        break;
-      case 's':
-        opts->status = 1;
-        break;
-      case 'm':
-        opts->mode = options_get_mode(optarg);
-        if(opts->mode == -1)
-          ret |= 1;
-        break;
-      case 'u':
-        ret |= options_open_socket_udp(opts, optarg);
-        break;
-      case 'x':
-        ret |= options_open_socket_unix(opts, optarg);
-        break;
-      case 'b':
-        opts->binary = 1;
-        break;
-      case 'd':
-        opts->daemon = 1;
-        break;
+    case 'h':
+      opts->help = 1;
+      break;
+    case 'r':
+      opts->reset = 1;
+      break;
+    case 't':
+      opts->test = 1;
+      break;
+    case 'v':
+      opts->verbose = 1;
+      break;
+    case 'c':
+      opts->configure = 1;
+      break;
+    case 's':
+      opts->status = 1;
+      break;
+    case 'm':
+      opts->mode = options_get_mode(optarg);
+      if(opts->mode == -1)
+        ret |= 1;
+      break;
+    case 'u':
+      // TODO
+      ret |= options_open_socket_udp(opts, optarg);
+      break;
+    case 'x':
+      strncpy(sockunix, optarg, BUF);
+      break;
+    case 'b':
+      opts->binary = 1;
+      break;
+    case 'd':
+      opts->daemon = 1;
+      break;
     }
   }
 
+  // this option sets whether we log to syslog or not
+  // and should checked first
   if(opts->daemon)
   {
+    use_syslog = 1;
     opts->input_standard = 0;
     opts->output_standard = 0;
+    openlog("e32", 0, LOG_DAEMON);
+  }
+
+  if(strnlen(sockunix, BUF))
+    ret |= options_open_socket_unix(opts, optarg);
+
+  if(strnlen(infile, BUF))
+  {
+    opts->input_file = options_open_file(optarg, "r");
+    ret |= opts->input_file == NULL;
+  }
+
+  if(strnlen(outfile, BUF))
+  {
+    opts->output_file = options_open_file(optarg, "w");
+    ret |= opts->output_file == NULL;
   }
 
   if(opts->input_file != NULL)
@@ -276,12 +317,13 @@ options_parse(struct options *opts, int argc, char *argv[])
   if(opts->output_file != NULL)
     opts->output_standard = 0;
 
+  // TODO fix this section if user passes in arguments without options
   if (optind < argc)
   {
-    printf("non-option ARGV-elements: ");
+    err_output("non-option ARGV-elements: ");
     while (optind < argc)
-      printf("%s ", argv[optind++]);
-    puts("");
+      err_output("%s ", argv[optind++]);
+    err_output("");
   }
 
   return ret;

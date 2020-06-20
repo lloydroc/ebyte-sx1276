@@ -1,10 +1,10 @@
 #include "../config.h"
 #include <stdio.h>
 
+#include <signal.h>
 #include <stdint.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <signal.h>
 #include "error.h"
 #include "become_daemon.h"
 #include "options.h"
@@ -18,6 +18,11 @@ static
 void signal_handler(int sig)
 {
   int exit_status;
+
+  if(opts.daemon)
+    info_output("daemon stopping");
+
+  options_deinit(&opts);
   exit_status = e32_deinit(&dev, &opts);
   exit(exit_status);
 }
@@ -72,17 +77,17 @@ main(int argc, char *argv[])
   {
     if(e32_set_mode(&dev, 3))
     {
-      fprintf(stderr, "unable to go to sleep mode\n");
+      err_output("unable to go to sleep mode\n");
       goto cleanup;
     }
     if(e32_cmd_read_version(&dev))
     {
-      fprintf(stderr, "unable to read version\n");
+      err_output("unable to read version\n");
       goto cleanup;
     }
     if(e32_cmd_read_settings(&dev))
     {
-      fprintf(stderr, "unable to read settings\n");
+      err_output("unable to read settings\n");
       goto cleanup;
     }
     e32_print_version(&dev);
@@ -92,11 +97,12 @@ main(int argc, char *argv[])
   else if(opts.daemon)
   {
     become_daemon();
+    info_output("daemon started");
   }
 
   ret |= e32_poll(&dev, &opts);
   if(ret)
-    fprintf(stderr, "error polling %d", ret);
+    err_output("error polling %d", ret);
 cleanup:
   ret |= e32_deinit(&dev, &opts);
 

@@ -147,7 +147,7 @@ e32_aux_poll(struct E32 *dev)
   int gpio_aux_val;
 
   /*
-  printf("reading aux before poll\n");
+  info_output("reading aux before poll\n");
   lseek(dev->gpio_aux_fd, 0, SEEK_SET);
   ret = gpio_read(dev->gpio_aux_fd, buf) != 2;
   if(ret == 0 && buf[0] == 1)
@@ -161,35 +161,35 @@ e32_aux_poll(struct E32 *dev)
   pfd.events = POLLPRI;
 
   if(dev->verbose)
-    printf("waiting for rising edge of AUX\n");
+    debug_output("waiting for rising edge of AUX\n");
   ret = poll(&pfd, 1, timeout);
   if(ret == 0)
   {
-    fprintf(stderr, "poll timed out\n");
+    err_output("poll timed out\n");
     return 1;
   }
   else if (ret < 0)
   {
-    err_output("poll");
+    errno_output("poll");
     return 2;
   }
 
   if(dev->verbose)
-    printf("rising edge of AUX found\n");
+    debug_output("rising edge of AUX found\n");
 
   gpio_read(dev->gpio_aux_fd, &gpio_aux_val);
 
   if(dev->verbose)
-    printf("AUX value is %d\n", gpio_aux_val);
+    debug_output("AUX value is %d\n", gpio_aux_val);
 
   if(dev->verbose)
-    printf("sleeping\n");
+    debug_output("sleeping\n");
 
   // TODO this line has been the biggest source of pain
   usleep(540000);
 
   if(gpio_aux_val != 1)
-    fprintf(stderr, "AUX was low after rising edge?\n");
+    err_output("AUX was low after rising edge?\n");
 
   return gpio_aux_val != 1;
 }
@@ -201,14 +201,14 @@ e32_set_mode(struct E32 *dev, int mode)
 
   if(e32_get_mode(dev))
   {
-    fprintf(stderr, "unable to get mode\n");
+    err_output("unable to get mode\n");
     return 1;
   }
 
   if(dev->mode == mode)
   {
     if(dev->verbose)
-      printf("mode %d unchanged\n", mode);
+      debug_output("mode %d unchanged\n", mode);
     return 0;
   }
 
@@ -227,7 +227,7 @@ e32_set_mode(struct E32 *dev, int mode)
     return ret;
 
   if(dev->verbose)
-    printf("new mode %d, prev mode is %d\n", mode, dev->prev_mode);
+    debug_output("new mode %d, prev mode is %d\n", mode, dev->prev_mode);
 
   if(dev->prev_mode == 3 && dev->mode != 3)
   {
@@ -257,7 +257,7 @@ e32_get_mode(struct E32 *dev)
   dev->mode = m0+m1;
 
   if(dev->verbose)
-    printf("read mode %d\n", dev->mode);
+    debug_output("read mode %d\n", &dev->mode);
 
   return ret;
 }
@@ -276,13 +276,9 @@ e32_deinit(struct E32 *dev, struct options* opts)
   ret |= gpio_unexport(opts->gpio_m1);
   ret |= gpio_unexport(opts->gpio_aux);
 */
-  if(opts->output_file)
-    ret |= fclose(opts->output_file);
+
 
   ret |= close(dev->uart_fd);
-
-  if(opts->fd_socket_unix != -1)
-    close(opts->fd_socket_unix);
 
   list_destroy(dev->socket_list);
   free(dev->socket_list);
@@ -298,14 +294,14 @@ e32_cmd_read_settings(struct E32 *dev)
   uint8_t *buf_ptr;
 
   if(dev->verbose)
-    puts("writing settings command");
+    debug_output("writing settings command");
 
   bytes = write(dev->uart_fd, cmd, 3);
   if(bytes == -1)
    return -1;
 
   if(dev->verbose)
-    puts("reading settings command");
+    debug_output("reading settings command");
 
   bytes = 0;
   buf_ptr = dev->settings;
@@ -461,58 +457,58 @@ e32_cmd_read_settings(struct E32 *dev)
 void
 e32_print_settings(struct E32 *dev)
 {
-  printf("Settings Raw Value:       0x");
-  for(int i=0; i<6; i++) printf("%02x", dev->settings[i]);
-  puts("");
+  info_output("Settings Raw Value:       0x");
+  for(int i=0; i<6; i++) info_output("%02x", dev->settings[i]);
+  info_output("");
 
   if(dev->power_down_save)
-    printf("Power Down Save:          Save parameters on power down\n");
+    info_output("Power Down Save:          Save parameters on power down\n");
   else
-    printf("Power Down Save:          Discard parameters on power down\n");
+    info_output("Power Down Save:          Discard parameters on power down\n");
 
-  printf("Address:                  0x%02x%02x\n", dev->addh, dev->addl);
+  info_output("Address:                  0x%02x%02x\n", dev->addh, dev->addl);
 
   switch(dev->parity)
   {
   case 0:
-    printf("Parity:                   8N1\n");
+    info_output("Parity:                   8N1\n");
     break;
   case 1:
-    printf("Parity:                   8O1\n");
+    info_output("Parity:                   8O1\n");
     break;
   case 2:
-    printf("Parity:                   8E1\n");
+    info_output("Parity:                   8E1\n");
     break;
   case 3:
-    printf("Parity:                   8N1\n");
+    info_output("Parity:                   8N1\n");
     break;
   default:
-    printf("Parity:                   Unknown\n");
+    info_output("Parity:                   Unknown\n");
     break;
   }
 
-  printf("UART Baud Rate:           %d bps\n", dev->uart_baud);
-  printf("Air Data Rate:            %d bps\n", dev->air_data_rate);
-  printf("Channel:                  %d MHz\n", dev->channel);
+  info_output("UART Baud Rate:           %d bps\n", dev->uart_baud);
+  info_output("Air Data Rate:            %d bps\n", dev->air_data_rate);
+  info_output("Channel:                  %d MHz\n", dev->channel);
 
   if(dev->transmission_mode)
-    printf("Transmission Mode:        Transparent\n");
+    info_output("Transmission Mode:        Transparent\n");
   else
-    printf("Transmission Mode:        Fixed\n");
+    info_output("Transmission Mode:        Fixed\n");
 
   if(dev->io_drive)
-    printf("IO Drive:                 TXD and AUX push-pull output, RXD pull-up input\n");
+    info_output("IO Drive:                 TXD and AUX push-pull output, RXD pull-up input\n");
   else
-    printf("IO Drive:                 TXD and AUX open-collector output, RXD open-collector input\n");
+    info_output("IO Drive:                 TXD and AUX open-collector output, RXD open-collector input\n");
 
-  printf("Wireless Wakeup Time:     %d ms\n", dev->wireless_wakeup_time);
+  info_output("Wireless Wakeup Time:     %d ms\n", dev->wireless_wakeup_time);
 
   if(dev->fec)
-    printf("Forward Error Correction: on\n");
+    info_output("Forward Error Correction: on\n");
   else
-    printf("Forward Error Correction: off\n");
+    info_output("Forward Error Correction: off\n");
 
-  printf("TX Power:                 %d dBm\n", dev->tx_power_dbm);
+  info_output("TX Power:                 %d dBm\n", dev->tx_power_dbm);
 }
 
 int
@@ -529,14 +525,14 @@ e32_cmd_read_version(struct E32 *dev)
   uint8_t *buf;
 
   if(dev->verbose)
-    puts("writing version command");
+    debug_output("writing version command");
 
   bytes = write(dev->uart_fd, cmd, 3);
   if(bytes == -1)
    return -1;
 
   if(dev->verbose)
-    puts("reading version");
+    debug_output("reading version");
 
   bytes = 0;
   buf = dev->version;
@@ -551,7 +547,7 @@ e32_cmd_read_version(struct E32 *dev)
 
   if(dev->version[0] != 0xC3)
   {
-    fprintf(stderr, "mismatch 0x%02x != 0xc3\n", dev->version[0]);
+    err_output("mismatch 0x%02x != 0xc3\n", dev->version[0]);
     return -1;
   }
 
@@ -588,13 +584,13 @@ e32_cmd_read_version(struct E32 *dev)
 void
 e32_print_version(struct E32 *dev)
 {
-  printf("Version Raw Value:        0x");
+  info_output("Version Raw Value:        0x");
   for(int i=0;i<4;i++)
-    printf("%02x", dev->version[i]);
-  puts("");
-  printf("Frequency:                %d MHz\n", dev->frequency_mhz);
-  printf("Version:                  %d\n", dev->ver);
-  printf("Features:                 0x%02x\n", dev->features);
+    info_output("%02x", dev->version[i]);
+  info_output("");
+  info_output("Frequency:                %d MHz\n", dev->frequency_mhz);
+  info_output("Version:                  %d\n", dev->ver);
+  info_output("Features:                 0x%02x\n", dev->features);
 }
 
 int
@@ -622,13 +618,12 @@ e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len)
   bytes = write(dev->uart_fd, buf, buf_len);
   if(bytes == -1)
   {
-    printf("here\n");
-    err_output("writing to e32 uart\n");
+    errno_output("writing to e32 uart\n");
     return -1;
   }
   else if(bytes != buf_len)
   {
-    printf("wrote only %d of %d\n", bytes, buf_len);
+    warn_output("wrote only %d of %d\n", bytes, buf_len);
     return bytes;
   }
 
@@ -692,19 +687,19 @@ e32_poll(struct E32 *dev, struct options *opts)
     pfd[3].events = POLLIN;
   }
 
-  printf("waiting for input\n");
+  debug_output("waiting for input\n");
   loop = 1;
   while(loop)
   {
     ret = poll(pfd, 4, -1);
     if(ret == 0)
     {
-      fprintf(stderr, "poll timed out\n");
+      err_output("poll timed out\n");
       return 1;
     }
     else if (ret < 0)
     {
-      err_output("poll");
+      errno_output("poll");
       return 2;
     }
 
@@ -713,11 +708,11 @@ e32_poll(struct E32 *dev, struct options *opts)
     {
       pfd[0].revents ^= POLLIN;
 
-      printf("reading from fd %d\n", pfd[0].fd);
+      debug_output("reading from fd %d\n", pfd[0].fd);
       bytes = read(pfd[0].fd, &buf, E32_TX_BUF_BYTES);
-      printf("got %d bytes\n", bytes);
+      debug_output("got %d bytes\n", bytes);
 
-      printf("writing to uart\n");
+      debug_output("writing to uart\n");
       ret = e32_transmit(dev, buf, bytes);
       if(ret)
       {
@@ -727,7 +722,8 @@ e32_poll(struct E32 *dev, struct options *opts)
       /* sent input through a pipe */
       if(!tty && bytes < E32_TX_BUF_BYTES)
       {
-        printf("getting out of loop\n");
+        if(dev->verbose)
+          debug_output("getting out of loop\n");
         loop = 0;
       }
     }
@@ -747,7 +743,7 @@ e32_poll(struct E32 *dev, struct options *opts)
       if(opts->output_standard)
       {
         buf[bytes] = '\0';
-        printf("%s", buf);
+        info_output("%s", buf);
         fflush(stdout);
       }
 
@@ -760,7 +756,7 @@ e32_poll(struct E32 *dev, struct options *opts)
         bytes = sendto(pfd[3].fd, buf, bytes, 0, (struct sockaddr*) cl, addrlen);
         if(bytes == -1)
         {
-          err_output("unable to send back status to unix socket");
+          errno_output("unable to send back status to unix socket");
           list_remove(dev->socket_list, cl);
         }
       }
@@ -773,30 +769,30 @@ e32_poll(struct E32 *dev, struct options *opts)
       pfd[2].revents ^= POLLIN;
 
       if(opts->verbose)
-        printf("reading from fd %d\n", pfd[2].fd);
+        debug_output("reading from fd %d\n", pfd[2].fd);
 
       bytes = fread(buf, 1, E32_TX_BUF_BYTES, opts->input_file);
 
       if(opts->verbose)
-        printf("writing %d bytes from file to uart\n", bytes);
+        debug_output("writing %d bytes from file to uart\n", bytes);
 
       if(e32_transmit(dev, buf, bytes))
       {
-        fprintf(stderr, "error in transmit\n");
+        err_output("error in transmit\n");
         //return 3;
       }
 
       if(opts->output_standard)
       {
         buf[bytes] = '\0';
-        printf("%s", buf);
+        info_output("%s", buf);
       }
 
       /* all bytes read from file */
       if(bytes < E32_TX_BUF_BYTES)
       {
         if(opts->verbose)
-          printf("getting out of loop\n");
+          debug_output("getting out of loop\n");
         loop = 0;
       }
     }
@@ -811,24 +807,24 @@ e32_poll(struct E32 *dev, struct options *opts)
       bytes = recvfrom(pfd[3].fd, buf, E32_TX_BUF_BYTES, 0, (struct sockaddr*) &client, &addrlen);
       if(bytes == -1)
       {
-        err_output("error receiving from unix domain socket");
+        errno_output("error receiving from unix domain socket");
         continue;
       }
       else if(bytes > E32_TX_BUF_BYTES)
       {
-        fprintf(stderr, "overflow: datagram truncated to %d bytes", E32_TX_BUF_BYTES);
+        err_output("overflow: datagram truncated to %d bytes", E32_TX_BUF_BYTES);
         bytes = E32_TX_BUF_BYTES;
         clret++;
       }
 
       if(opts->verbose)
-        printf("received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
+        debug_output("received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
 
       /* if not in the list add them */
       if(bytes == 0 && list_index_of(dev->socket_list, &client))
       {
         if(opts->verbose)
-          printf("adding client %d at %s\n", list_size(dev->socket_list), client.sun_path);
+          debug_output("adding client %d at %s\n", list_size(dev->socket_list), client.sun_path);
 
         struct sockaddr_un *new_client;
         new_client = malloc(sizeof(struct sockaddr_un));
@@ -838,7 +834,7 @@ e32_poll(struct E32 *dev, struct options *opts)
       else if(bytes == 0)
       {
         if(opts->verbose)
-          printf("removing client at %s\n", client.sun_path);
+          debug_output("removing client at %s\n", client.sun_path);
 
         list_remove(dev->socket_list, &client);
       }
@@ -848,26 +844,26 @@ e32_poll(struct E32 *dev, struct options *opts)
       {
         bytes = sendto(pfd[3].fd, &clret, 1, 0, (struct sockaddr*) &client, addrlen);
         if(bytes == -1)
-          err_output("unable to send back status to unix socket");
-          continue;
+          errno_output("unable to send back status to unix socket");
+        continue;
       }
 
       if(e32_transmit(dev, buf, bytes))
       {
-        fprintf(stderr, "error in transmit\n");
+        err_output("error in transmit\n");
         clret++;
       }
 
       if(opts->output_standard)
       {
         buf[bytes] = '\0';
-        printf("%s", buf);
+        info_output("%s", buf);
         fflush(stdout);
       }
 
       bytes = sendto(pfd[3].fd, &clret, 1, 0, (struct sockaddr*) &client, addrlen);
       if(bytes == -1)
-        err_output("unable to send back status to unix socket");
+        errno_output("unable to send back status to unix socket");
     }
   }
 

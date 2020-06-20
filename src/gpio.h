@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "error.h"
 
 #define GPIO_PATH "/sys/class/gpio"
 #define GPIO_EXPORT_PATH "/sys/class/gpio/export"
