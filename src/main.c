@@ -20,7 +20,7 @@ void signal_handler(int sig)
   int exit_status;
 
   if(opts.daemon)
-    info_output("daemon stopping");
+    info_output("daemon stopping pid=%d", getpid());
 
   options_deinit(&opts);
   exit_status = e32_deinit(&dev, &opts);
@@ -97,7 +97,7 @@ main(int argc, char *argv[])
   else if(opts.daemon)
   {
     become_daemon();
-    info_output("daemon started");
+    info_output("daemon started pid=%d", getpid());
   }
 
   ret |= e32_poll(&dev, &opts);

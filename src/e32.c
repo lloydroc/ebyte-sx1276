@@ -257,7 +257,7 @@ e32_get_mode(struct E32 *dev)
   dev->mode = m0+m1;
 
   if(dev->verbose)
-    debug_output("read mode %d\n", &dev->mode);
+    debug_output("read mode %d\n", dev->mode);
 
   return ret;
 }

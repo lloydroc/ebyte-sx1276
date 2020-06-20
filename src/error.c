@@ -1,5 +1,7 @@
 #include "error.h"
 
+#define BUF_SIZE 1024
+
 static char *ename[] = {
     /*   0 */ "",
     /*   1 */ "EPERM", "ENOENT", "ESRCH", "EINTR", "EIO", "ENXIO",
@@ -30,17 +32,18 @@ static char *ename[] = {
 };
 
 static void
-output(int priority, const char *format, ...)
+output(int priority, const char *format, va_list ap)
 {
-  va_list argList;
-  va_start(argList, format);
+  char buf[BUF_SIZE];
+
+  vsnprintf(buf, BUF_SIZE, format, ap);
 
   if(use_syslog)
-    vsyslog(priority, format, argList);
+    syslog(priority, buf);
+  else if(priority > LOG_WARNING)
+    fputs(buf, stdout);
   else
-    vprintf(format, argList);
-
-  va_end(argList);
+    fputs(buf, stderr);
 }
 
 void
@@ -93,19 +96,19 @@ output_errno(int err, const char *format, va_list ap)
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-    snprintf(buf, BUF_SIZE, "ERROR%s %s\n", errText, userMsg);
+  snprintf(buf, BUF_SIZE, "ERROR%s %s\n", errText, userMsg);
 #pragma GCC diagnostic pop
 
-    if(use_syslog)
-    {
-      syslog(LOG_ERR, buf);
-    }
-    else
-    {
-      fflush(stdout);     /* Flush any pending stdout */
-      fputs(buf, stderr);
-      fflush(stderr);     /* In case stderr is not line-buffered */
-    }
+  if(use_syslog)
+  {
+    syslog(LOG_ERR, buf);
+  }
+  else
+  {
+    fflush(stdout);     /* Flush any pending stdout */
+    fputs(buf, stderr);
+    fflush(stderr);     /* In case stderr is not line-buffered */
+  }
 }
 
 void
