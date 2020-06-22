@@ -85,7 +85,6 @@ err_output(const char *format, ...)
 static void
 output_errno(int err, const char *format, va_list ap)
 {
-#define BUF_SIZE 1024
   char buf[BUF_SIZE], userMsg[BUF_SIZE], errText[BUF_SIZE];
 
   vsnprintf(userMsg, BUF_SIZE, format, ap);

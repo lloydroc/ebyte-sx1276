@@ -4,12 +4,13 @@
 #include <signal.h>
 #include <stdint.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include "error.h"
 #include "become_daemon.h"
-#include "options.h"
-#include "gpio.h"
+#include "error.h"
 #include "e32.h"
+#include "gpio.h"
+#include "options.h"
 
 struct options opts;
 struct E32 dev;

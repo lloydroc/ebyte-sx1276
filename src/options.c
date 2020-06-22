@@ -64,6 +64,8 @@ options_deinit(struct options *opts)
 
   if(opts->fd_socket_unix != -1)
     close(opts->fd_socket_unix);
+
+  return ret;
 }
 
 static int
@@ -297,17 +299,17 @@ options_parse(struct options *opts, int argc, char *argv[])
   }
 
   if(strnlen(sockunix, BUF))
-    ret |= options_open_socket_unix(opts, optarg);
+    ret |= options_open_socket_unix(opts, sockunix);
 
   if(strnlen(infile, BUF))
   {
-    opts->input_file = options_open_file(optarg, "r");
+    opts->input_file = options_open_file(infile, "r");
     ret |= opts->input_file == NULL;
   }
 
   if(strnlen(outfile, BUF))
   {
-    opts->output_file = options_open_file(optarg, "w");
+    opts->output_file = options_open_file(outfile, "w");
     ret |= opts->output_file == NULL;
   }
 

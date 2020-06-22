@@ -11,8 +11,24 @@
 
 #define E32_TX_BUF_BYTES 58
 
+enum E32_mode
+{
+  normal,
+  wake_up,
+  power_save,
+  sleep_mode
+};
+
+enum E32_state
+{
+  IDLE,
+  RX,
+  TX
+};
+
 struct E32
 {
+  enum E32_state state;
   int verbose;
   int gpio_m0_fd;
   int gpio_m1_fd;
@@ -39,14 +55,6 @@ struct E32
   int fec;
   int tx_power_dbm;
   struct List *socket_list;
-};
-
-enum E32_mode
-{
-  normal,
-  wake_up,
-  power_save,
-  sleep_mode
 };
 
 int
