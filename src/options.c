@@ -21,7 +21,6 @@ usage(char *progname)
    --aux                      GPIO Aux Pin for input interrupt\n\
    --in-file  FILENAME        Read intput from a File\n\
    --out-file FILENAME        Write output to a File\n\
--u --socket-udp HOST:PORT     Output data to a UDP Socket\n\
 -x --socket-unix FILENAME     Send and Receive data from a Unix Domain Socket\n\
 -b --binary                   Used with the -f and -u options for binary output\n\
 -d --daemon                   Run as a Daemon\n\
@@ -47,7 +46,6 @@ options_init(struct options *opts)
   opts->output_standard = 1;
   opts->input_file = NULL;
   opts->output_file = NULL;
-  opts->fd_socket_udp = -1;
   opts->fd_socket_unix = -1;
 }
 
@@ -92,71 +90,6 @@ options_open_file(char *optarg, char *mode)
     errno_output("unable to open file %s", optarg);
   }
   return file;
-}
-
-static
-int
-options_open_socket_udp(struct options *opts, char *optarg)
-{
-  struct hostent *he;
-  int sockfd, rc, optval;
-
-  int prt;
-  size_t len;
-  char *index;
-  char host[1024];
-  char port[6];
-
-  // separate the host and port by the :
-
-  len = strnlen(optarg, 1024);
-  if(len < 3 || len == 1024)
-    return 1;
-
-  index = rindex(optarg, ':');
-  if(index == NULL)
-    return 1;
-
-  strncpy(port, index+1, 6);
-  len = strnlen(port, 6);
-  if(len < 1 || len == 6)
-    return 1;
-
-  prt = atoi(port);
-  *index = '\0';
-
-  strncpy(host, optarg, 1024);
-  len = strnlen(host, 1024);
-  if(len == 0 || len == 1024)
-    return 1;
-
-  if( (he = gethostbyname(host) ) == NULL ) {
-    // TODO this sets h_errno not errno
-    err_output("gethostbyname");
-    return 1;
-  }
-
-  bzero(&opts->socket_udp_dest, sizeof(struct sockaddr_in));
-  memcpy(&opts->socket_udp_dest.sin_addr, he->h_addr_list[0], he->h_length);
-  opts->socket_udp_dest.sin_family = AF_INET;
-  opts->socket_udp_dest.sin_port = htons(prt);
-
-  sockfd = socket(opts->socket_udp_dest.sin_family, SOCK_DGRAM, 0);
-  if(sockfd == -1)
-  {
-    errno_output("socket");
-  }
-
-  rc = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-  if(rc)
-  {
-    errno_output("setsockopt");
-    return 1;
-  }
-
-  opts->fd_socket_udp = sockfd;
-
-  return 0;
 }
 
 static int
@@ -222,7 +155,6 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"aux",                required_argument, 0,   0},
     {"in-file",            required_argument, 0,   0},
     {"out-file",           required_argument, 0,   0},
-    {"socket-udp",         required_argument, 0, 'u'},
     {"socket-unix",        required_argument, 0, 'x'},
     {"binary",                   no_argument, 0, 'b'},
     {"deamon",                   no_argument, 0, 'd'},
@@ -232,7 +164,7 @@ options_parse(struct options *opts, int argc, char *argv[])
   while(1)
   {
     option_index = 0;
-    c = getopt_long(argc, argv, "hrtvcsm:u:f:bdx:", long_options, &option_index);
+    c = getopt_long(argc, argv, "hrtvcsm:f:bdx:", long_options, &option_index);
 
     if(c == -1)
       break;
@@ -271,10 +203,6 @@ options_parse(struct options *opts, int argc, char *argv[])
       opts->mode = options_get_mode(optarg);
       if(opts->mode == -1)
         ret |= 1;
-      break;
-    case 'u':
-      // TODO
-      ret |= options_open_socket_udp(opts, optarg);
       break;
     case 'x':
       strncpy(sockunix, optarg, BUF);

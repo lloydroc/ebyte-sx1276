@@ -35,7 +35,6 @@ struct options
   int output_standard;
   FILE* input_file;
   FILE* output_file;
-  int fd_socket_udp;
   struct sockaddr_in socket_udp_dest;
   int fd_socket_unix;
   struct sockaddr_un socket_unix_server;

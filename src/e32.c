@@ -177,11 +177,10 @@ e32_set_mode(struct E32 *dev, int mode)
 
   if(dev->prev_mode == 3 && dev->mode != 3)
   {
-    if(e32_aux_poll(dev))
-      return 2;
+    // TODO
+    usleep(54000);
   }
 
-  usleep(10000);
 
   return ret;
 }
@@ -394,8 +393,7 @@ e32_cmd_read_settings(struct E32 *dev)
       dev->tx_power_dbm = 0;
   }
 
-  if(e32_aux_poll(dev))
-    return 2;
+  usleep(54000);
 
   return 0;
 }
@@ -405,7 +403,7 @@ e32_print_settings(struct E32 *dev)
 {
   info_output("Settings Raw Value:       0x");
   for(int i=0; i<6; i++) info_output("%02x", dev->settings[i]);
-  info_output("");
+  info_output("\n");
 
   if(dev->power_down_save)
     info_output("Power Down Save:          Save parameters on power down\n");
@@ -521,8 +519,7 @@ e32_cmd_read_version(struct E32 *dev)
   dev->ver = dev->version[2];
   dev->features = dev->version[3];
 
-  if(e32_aux_poll(dev))
-    return 2;
+  usleep(54000);
 
   return bytes != 4;
 }
@@ -533,7 +530,7 @@ e32_print_version(struct E32 *dev)
   info_output("Version Raw Value:        0x");
   for(int i=0;i<4;i++)
     info_output("%02x", dev->version[i]);
-  info_output("");
+  info_output("\n");
   info_output("Frequency:                %d MHz\n", dev->frequency_mhz);
   info_output("Version:                  %d\n", dev->ver);
   info_output("Features:                 0x%02x\n", dev->features);
@@ -548,7 +545,8 @@ e32_cmd_reset(struct E32 *dev)
   if(bytes != 3)
     return 1;
 
-  return e32_aux_poll(dev);
+  usleep(54000);
+  return 0;
 }
 
 int
@@ -614,8 +612,6 @@ e32_write_output(struct E32 *dev, struct options *opts, uint8_t* buf, const size
       ret++;
     }
   }
-
-  // TODO write to udp
 
   if(opts->output_standard)
   {
