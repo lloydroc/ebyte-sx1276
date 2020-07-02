@@ -157,7 +157,7 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"out-file",           required_argument, 0,   0},
     {"socket-unix",        required_argument, 0, 'x'},
     {"binary",                   no_argument, 0, 'b'},
-    {"deamon",                   no_argument, 0, 'd'},
+    {"daemon",                   no_argument, 0, 'd'},
     {0,                                    0, 0,   0}
   };
 

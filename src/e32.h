@@ -3,7 +3,6 @@
 
 #include <poll.h>
 #include <sys/time.h>
-#include <math.h>
 #include "options.h"
 #include "gpio.h"
 #include "uart.h"
