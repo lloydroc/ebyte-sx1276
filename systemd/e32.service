@@ -1,0 +1,8 @@
+[Unit]
+Description=ebyte e32 systemd service
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/e32 --daemon --socket-unix /run/e32.socket
+StandardOutput=journal
+StandardError=journal
