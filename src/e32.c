@@ -604,10 +604,14 @@ e32_write_output(struct E32 *dev, struct options *opts, uint8_t* buf, const size
     struct sockaddr_un *cl;
     cl = list_get_index(dev->socket_list, i);
     addrlen = sizeof(struct sockaddr_un);
+
+    if(dev->verbose)
+      debug_output("sending %d bytes to socket %s", bytes, cl->sun_path);
+
     outbytes = sendto(opts->fd_socket_unix, buf, bytes, 0, (struct sockaddr*) cl, addrlen);
     if(outbytes == -1)
     {
-      errno_output("unable to send back status to unix socket");
+      errno_output("unable to send back status to unix socket. removing from list.");
       list_remove(dev->socket_list, cl);
       ret++;
     }
@@ -734,7 +738,10 @@ e32_poll(struct E32 *dev, struct options *opts)
 
       bytes = read(pfd[1].fd, buf+total_bytes, E32_TX_BUF_BYTES);
       if(bytes == -1)
+      {
         errno_output("error reading from uart\n");
+        continue;
+      }
       else
         total_bytes += bytes;
 
@@ -802,8 +809,8 @@ e32_poll(struct E32 *dev, struct options *opts)
       if(opts->verbose)
         debug_output("received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
 
-      /* if not in the list add them */
-      if(bytes == 0 && list_index_of(dev->socket_list, &client))
+      // sending 0 bytes will register and we'll add to the client list
+      if(bytes == 0 && list_index_of(dev->socket_list, &client) == -1)
       {
         if(opts->verbose)
           debug_output("adding client %d at %s\n", list_size(dev->socket_list), client.sun_path);
@@ -813,15 +820,8 @@ e32_poll(struct E32 *dev, struct options *opts)
         memcpy(new_client, &client, sizeof(struct sockaddr_un));
         list_add_first(dev->socket_list, new_client);
       }
-      else if(bytes == 0)
-      {
-        if(opts->verbose)
-          debug_output("removing client at %s\n", client.sun_path);
 
-        list_remove(dev->socket_list, &client);
-      }
-
-      /* sending 0 bytes will register or de-register */
+      // send back an acknowledge of 1 byte to the client
       if(bytes == 0)
       {
         bytes = sendto(pfd[3].fd, &clret, 1, 0, (struct sockaddr*) &client, addrlen);
