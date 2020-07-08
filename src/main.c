@@ -72,6 +72,7 @@ main(int argc, char *argv[])
   {
     ret |= e32_set_mode(&dev, 3);
     ret |= e32_cmd_reset(&dev);
+    ret |= e32_set_mode(&dev, 0);
     goto cleanup;
   }
   if(opts.status)
@@ -89,6 +90,11 @@ main(int argc, char *argv[])
     if(e32_cmd_read_settings(&dev))
     {
       err_output("unable to read settings\n");
+      goto cleanup;
+    }
+    if(e32_set_mode(&dev, 0))
+    {
+      err_output("unable to go to normal mode\n");
       goto cleanup;
     }
     e32_print_version(&dev);
