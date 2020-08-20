@@ -1,0 +1,11 @@
+[Unit]
+Description=Timer to transmit on the ebyte e32
+
+[Timer]
+#OnCalendar=*-*-* *:*:00
+OnCalendar=*:*:0/10
+#OnUnitActiveSec=3s
+AccuracySec=1us
+
+[Install]
+WantedBy=e32.service

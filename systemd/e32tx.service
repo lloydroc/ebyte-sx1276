@@ -1,0 +1,12 @@
+[Unit]
+Description=Transmit on the ebyte e32
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/e32tx "the quick brown hare"
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+Wants=e32.service
