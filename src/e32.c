@@ -151,7 +151,10 @@ e32_set_mode(struct E32 *dev, int mode)
     return 1;
   }
 
-  if(dev->mode == mode)
+  dev->prev_mode = dev->mode;
+  dev->mode = mode;
+
+  if(dev->mode == dev->prev_mode)
   {
     if(dev->verbose)
       debug_output("mode %d unchanged\n", mode);
@@ -160,27 +163,23 @@ e32_set_mode(struct E32 *dev, int mode)
 
   int m0 = mode & 0x01;
   int m1 = mode & 0x02;
+  m1 >>= 1;
 
   ret  = gpio_write(dev->gpio_m0_fd, m0) != 1;
   ret |= gpio_write(dev->gpio_m1_fd, m1) != 1;
 
-  if(!ret)
+  if(ret)
   {
-    dev->prev_mode = dev->mode;
-    dev->mode = mode;
-  }
-  else
     return ret;
+  }
 
   if(dev->verbose)
     debug_output("new mode %d, prev mode is %d\n", mode, dev->prev_mode);
 
-  if(dev->prev_mode == 3 && dev->mode != 3)
+  if(dev->prev_mode != dev->mode)
   {
-    // TODO
-    usleep(54000);
+    usleep(3000);
   }
-
 
   return ret;
 }
@@ -239,14 +238,14 @@ e32_cmd_read_settings(struct E32 *dev)
   uint8_t *buf_ptr;
 
   if(dev->verbose)
-    debug_output("writing settings command");
+    debug_output("writing settings command\n");
 
   bytes = write(dev->uart_fd, cmd, 3);
   if(bytes == -1)
    return -1;
 
   if(dev->verbose)
-    debug_output("reading settings command");
+    debug_output("reading settings command\n");
 
   bytes = 0;
   buf_ptr = dev->settings;
@@ -469,14 +468,16 @@ e32_cmd_read_version(struct E32 *dev)
   uint8_t *buf;
 
   if(dev->verbose)
-    debug_output("writing version command");
+    debug_output("writing version command\n");
 
   bytes = write(dev->uart_fd, cmd, 3);
   if(bytes == -1)
    return -1;
 
   if(dev->verbose)
-    debug_output("reading version");
+    debug_output("reading version\n");
+
+  usleep(54000);
 
   bytes = 0;
   buf = dev->version;

@@ -12,7 +12,6 @@ usage(char *progname)
 -h --help                     Print help\n\
 -r --reset                    SW Reset\n\
 -t --test                     Perform a test\n\
--c --configure                Write Configuration\n\
 -v --verbose                  Verbose Output\n\
 -s --status                   Get status model, frequency, address, channel, data rate, baud, parity and transmit power.\n\
 -m --mode MODE                Set mode to normal, wake-up, power-save or sleep.\n\
@@ -25,6 +24,7 @@ usage(char *progname)
 -b --binary                   Used with the -f and -u options for binary output\n\
 -d --daemon                   Run as a Daemon\n\
 ");
+  printf("\nVersion: %s\n", PACKAGE_VERSION);
 }
 
 void
@@ -36,7 +36,6 @@ options_init(struct options *opts)
   opts->verbose = 0;
   opts->status = 0;
   opts->mode = -1;
-  opts->configure = 0;
   opts->uart_dev = 0;
   opts->gpio_m0 = 23;
   opts->gpio_m1 = 24;
@@ -148,7 +147,6 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"test",                     no_argument, 0, 't'},
     {"verbose",                  no_argument, 0, 'v'},
     {"status",                   no_argument, 0, 's'},
-    {"configure",                no_argument, 0, 'c'},
     {"mode",               required_argument, 0, 'm'},
     {"m0",                 required_argument, 0,   0},
     {"m1",                 required_argument, 0,   0},
@@ -164,7 +162,7 @@ options_parse(struct options *opts, int argc, char *argv[])
   while(1)
   {
     option_index = 0;
-    c = getopt_long(argc, argv, "hrtvcsm:f:bdx:", long_options, &option_index);
+    c = getopt_long(argc, argv, "hrtvsm:f:bdx:", long_options, &option_index);
 
     if(c == -1)
       break;
@@ -192,9 +190,6 @@ options_parse(struct options *opts, int argc, char *argv[])
       break;
     case 'v':
       opts->verbose = 1;
-      break;
-    case 'c':
-      opts->configure = 1;
       break;
     case 's':
       opts->status = 1;
