@@ -174,11 +174,11 @@ e32_set_mode(struct E32 *dev, int mode)
   }
 
   if(dev->verbose)
-    debug_output("new mode %d, prev mode is %d\n", mode, dev->prev_mode);
+    debug_output("new mode %d, prev mode is %d\n", dev->mode, dev->prev_mode);
 
   if(dev->prev_mode != dev->mode)
   {
-    usleep(3000);
+    usleep(20000);
   }
 
   return ret;
@@ -476,8 +476,6 @@ e32_cmd_read_version(struct E32 *dev)
 
   if(dev->verbose)
     debug_output("reading version\n");
-
-  usleep(54000);
 
   bytes = 0;
   buf = dev->version;
