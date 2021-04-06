@@ -49,3 +49,5 @@ src/.deps
 config.h
 tags
 e32
+\#*#
+\.\#*

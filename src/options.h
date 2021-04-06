@@ -1,5 +1,6 @@
 #ifndef OPTIONS_H
 #define OPTIONS_H
+#include "../config.h"
 #include <arpa/inet.h>
 #include <getopt.h>
 #include <netinet/in.h>
@@ -24,7 +25,6 @@ struct options
   int test;
   int verbose;
   int status;
-  int configure;
   int uart_dev;
   int gpio_m0;
   int gpio_m1;

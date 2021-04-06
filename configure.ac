@@ -1,4 +1,4 @@
-AC_INIT([e32], [1.0], [lloyd@lloydrochester.com])
+AC_INIT([e32], [1.1], [lloyd@lloydrochester.com])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADERS([config.h])
@@ -23,7 +23,7 @@ AC_TYPE_UINT8_T
 AC_FUNC_FORK
 AC_FUNC_GETGROUPS
 AC_FUNC_MALLOC
-AC_CHECK_FUNCS([bzero dup2 gethostbyname socket strerror strncasecmp strstr])
+AC_CHECK_FUNCS([bzero memset dup2 gethostbyname socket strerror strncasecmp strstr])
 
 PKG_PROG_PKG_CONFIG
 AC_ARG_WITH([systemdsystemunitdir],
