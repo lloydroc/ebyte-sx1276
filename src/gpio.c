@@ -34,6 +34,7 @@ gpio_permissions_valid()
             return 0;
     }
 
+    err_output("permissions invalid to access %s\n", GPIO_EXPORT_PATH);
     return -1;
 }
 

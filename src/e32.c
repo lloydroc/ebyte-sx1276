@@ -7,6 +7,9 @@ e32_init_gpio(struct options *opts, struct E32 *dev)
   int ninputs, noutputs;
   int hm0=0, hm1=0, haux=0;
 
+  if(gpio_permissions_valid())
+    return -1;
+
   if(gpio_exists())
     return 1;
 
@@ -120,6 +123,8 @@ e32_init(struct E32 *dev, struct options *opts)
 {
   int ret;
 
+  dev->socket_list = NULL;
+
   ret = e32_init_gpio(opts, dev);
 
   if(ret)
@@ -224,8 +229,11 @@ e32_deinit(struct E32 *dev, struct options* opts)
 
   ret |= close(dev->uart_fd);
 
-  list_destroy(dev->socket_list);
-  free(dev->socket_list);
+  if(dev->socket_list != NULL)
+  {
+    list_destroy(dev->socket_list);
+    free(dev->socket_list);
+  }
 
   return ret;
 }

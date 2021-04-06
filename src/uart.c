@@ -10,9 +10,9 @@ tty_open(char *ptyName)
   UART = open(ptyName, O_RDWR | O_NOCTTY);
   if(UART == -1)
   {
-    err_output("error opening terminal %s\n", ptyName);
+    errno_output("error opening terminal %s", ptyName);
     close(UART);
-    return UART;
+    return -1;
   }
 
   if(tcgetattr(UART, &ttyOrig) == -1)

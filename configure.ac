@@ -23,7 +23,7 @@ AC_TYPE_UINT8_T
 AC_FUNC_FORK
 AC_FUNC_GETGROUPS
 AC_FUNC_MALLOC
-AC_CHECK_FUNCS([bzero dup2 gethostbyname socket strerror strncasecmp strstr])
+AC_CHECK_FUNCS([bzero memset dup2 gethostbyname socket strerror strncasecmp strstr])
 
 PKG_PROG_PKG_CONFIG
 AC_ARG_WITH([systemdsystemunitdir],
