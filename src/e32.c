@@ -262,7 +262,7 @@ e32_cmd_read_settings(struct E32 *dev)
   bytes = read(dev->uart_fd, dev->settings, 6);
   if(bytes == 0)
   {
-    err_output("timed out");
+    err_output("timed out\n");
     return -3;
   }
 
@@ -490,7 +490,7 @@ e32_cmd_read_version(struct E32 *dev)
   bytes = read(dev->uart_fd, dev->version, 4);
   if(bytes == 0)
   {
-    err_output("timed out");
+    err_output("timed out\n");
     return -3;
   }
 

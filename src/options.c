@@ -8,6 +8,7 @@ usage(char *progname)
 {
   printf("Usage: %s [OPTIONS]\n\n", progname);
   printf("A command line tool to interact E32.\n");
+  printf("Version %s\n", VERSION);
   printf("OPTIONS:\n\
 -h --help                     Print help\n\
 -r --reset                    SW Reset\n\
@@ -22,7 +23,6 @@ usage(char *progname)
    --in-file  FILENAME        Read intput from a File\n\
    --out-file FILENAME        Write output to a File\n\
 -x --socket-unix FILENAME     Send and Receive data from a Unix Domain Socket\n\
--b --binary                   Used with the -f and -u options for binary output\n\
 -d --daemon                   Run as a Daemon\n\
 ");
   printf("\nVersion: %s\n", PACKAGE_VERSION);
@@ -211,9 +211,6 @@ options_parse(struct options *opts, int argc, char *argv[])
       break;
     case 'x':
       strncpy(sockunix, optarg, BUF);
-      break;
-    case 'b':
-      opts->binary = 1;
       break;
     case 'd':
       opts->daemon = 1;

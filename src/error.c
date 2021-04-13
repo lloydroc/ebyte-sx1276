@@ -39,7 +39,7 @@ output(int priority, const char *format, va_list ap)
   vsnprintf(buf, BUF_SIZE, format, ap);
 
   if(use_syslog)
-    syslog(priority, buf);
+    syslog(priority, "%s", buf);
   else if(priority > LOG_WARNING)
     fputs(buf, stdout);
   else
@@ -100,7 +100,7 @@ output_errno(int err, const char *format, va_list ap)
 
   if(use_syslog)
   {
-    syslog(LOG_ERR, buf);
+    syslog(LOG_ERR, "%s", buf);
   }
   else
   {
