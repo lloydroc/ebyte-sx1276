@@ -3,6 +3,7 @@
 
 #include <poll.h>
 #include <sys/time.h>
+#include <termios.h>
 #include "options.h"
 #include "gpio.h"
 #include "uart.h"
@@ -33,6 +34,7 @@ struct E32
   int gpio_m1_fd;
   int gpio_aux_fd;
   int uart_fd;
+  struct termios *tty;
   int prev_mode;
   int mode;
   uint8_t version[4];

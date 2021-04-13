@@ -14,6 +14,7 @@ usage(char *progname)
 -t --test                     Perform a test\n\
 -v --verbose                  Verbose Output\n\
 -s --status                   Get status model, frequency, address, channel, data rate, baud, parity and transmit power.\n\
+-y --tty                      The UART to use. Defaults to /dev/ttyAMA0\n\
 -m --mode MODE                Set mode to normal, wake-up, power-save or sleep.\n\
    --m0                       GPIO M0 Pin for output\n\
    --m1                       GPIO M1 Pin for output\n\
@@ -46,6 +47,7 @@ options_init(struct options *opts)
   opts->input_file = NULL;
   opts->output_file = NULL;
   opts->fd_socket_unix = -1;
+  snprintf(opts->tty_name, 64, "/dev/ttyAMA0");
 }
 
 int
@@ -103,7 +105,7 @@ options_open_socket_unix(struct options *opts, char *optarg)
 
   if(strlen(optarg) > sizeof(opts->socket_unix_server.sun_path)-1)
   {
-    err_output("socket path too long must be %d chars\n", sizeof(opts->socket_unix_server.sun_path-1));
+    err_output("socket path too long must be %d chars\n", sizeof(opts->socket_unix_server.sun_path)-1);
     return 2;
   }
 
@@ -147,6 +149,7 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"test",                     no_argument, 0, 't'},
     {"verbose",                  no_argument, 0, 'v'},
     {"status",                   no_argument, 0, 's'},
+    {"tty",                required_argument, 0, 'y'},
     {"mode",               required_argument, 0, 'm'},
     {"m0",                 required_argument, 0,   0},
     {"m1",                 required_argument, 0,   0},
@@ -162,7 +165,7 @@ options_parse(struct options *opts, int argc, char *argv[])
   while(1)
   {
     option_index = 0;
-    c = getopt_long(argc, argv, "hrtvsm:f:bdx:", long_options, &option_index);
+    c = getopt_long(argc, argv, "hrtvsy:m:f:bdx:", long_options, &option_index);
 
     if(c == -1)
       break;
@@ -178,6 +181,8 @@ options_parse(struct options *opts, int argc, char *argv[])
         strncpy(outfile, optarg, BUF);
       else if(strcmp("in-file", long_options[option_index].name) == 0)
         strncpy(infile, optarg, BUF);
+      else if(strcmp("tty", long_options[option_index].name) == 0)
+        strncpy(opts->tty_name, optarg, 64);
       break;
     case 'h':
       opts->help = 1;
@@ -194,10 +199,15 @@ options_parse(struct options *opts, int argc, char *argv[])
     case 's':
       opts->status = 1;
       break;
+    case 'y':
+      strncpy(opts->tty_name, optarg, 64);
+      break;
     case 'm':
       opts->mode = options_get_mode(optarg);
       if(opts->mode == -1)
+      {
         ret |= 1;
+      }
       break;
     case 'x':
       strncpy(sockunix, optarg, BUF);
