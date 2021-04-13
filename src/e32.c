@@ -98,7 +98,7 @@ e32_init_uart(struct E32 *dev, char *tty_name)
 {
   int ret;
 
-  ret = tty_open(tty_name, &dev->uart_fd, dev->tty);
+  ret = tty_open(tty_name, &dev->uart_fd, &dev->tty);
   return ret;
 }
 
@@ -245,7 +245,6 @@ e32_cmd_read_settings(struct E32 *dev)
 {
   ssize_t bytes;
   const uint8_t cmd[3] = {0xC1, 0xC1, 0xC1};
-  uint8_t *buf_ptr;
 
   if(dev->verbose)
     debug_output("writing settings command\n");
@@ -258,7 +257,7 @@ e32_cmd_read_settings(struct E32 *dev)
     debug_output("reading settings\n");
 
   // set a .5 second timout
-  tty_set_read_with_timeout(dev->uart_fd, dev->tty, 5);
+  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 5);
 
   bytes = read(dev->uart_fd, dev->settings, 6);
   if(bytes == 0)
@@ -474,7 +473,6 @@ e32_cmd_read_version(struct E32 *dev)
 {
   ssize_t bytes;
   const uint8_t cmd[3] = {0xC3, 0xC3, 0xC3};
-  uint8_t *buf;
 
   if(dev->verbose)
     debug_output("writing version command\n");
@@ -487,7 +485,7 @@ e32_cmd_read_version(struct E32 *dev)
     debug_output("reading version\n");
 
   // set a .5 second timout
-  tty_set_read_with_timeout(dev->uart_fd, dev->tty, 5);
+  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 5);
 
   bytes = read(dev->uart_fd, dev->version, 4);
   if(bytes == 0)
@@ -652,7 +650,7 @@ e32_poll(struct E32 *dev, struct options *opts)
 
   tty = isatty(fileno(stdin));
 
-  tty_set_read_polling(dev->uart_fd, dev->tty);
+  tty_set_read_polling(dev->uart_fd, &dev->tty);
 
   // used for stdin or a pipe
   pfd[0].fd = -1;

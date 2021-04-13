@@ -165,7 +165,7 @@ options_parse(struct options *opts, int argc, char *argv[])
   while(1)
   {
     option_index = 0;
-    c = getopt_long(argc, argv, "hrtvsy:m:f:bdx:", long_options, &option_index);
+    c = getopt_long(argc, argv, "hrtvsy:m:bdx:", long_options, &option_index);
 
     if(c == -1)
       break;
