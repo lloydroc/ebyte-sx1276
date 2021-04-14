@@ -1,6 +1,10 @@
 # EByte E32 SX1276 for the Raspberry Pi
 
-See this [Blog Post](https://lloydrochester.com/post/hardware/e32-sx1276-lora/) for details. This repository has the source which requres autotools to build. If you just want to build the software and run it I recommend just getting the tarball below where you can build from source.
+See this [Blog Post](https://lloydrochester.com/post/hardware/e32-sx1276-lora/) for details.
+
+This repository contains the source code, as well as, the source code to distribute the tool which requres GNU Autotools to build. If you just want to run the tool I recommend just getting the tarball below where you can build from source.
+
+# Getting Started
 
 ```
 wget http://lloydrochester.com/code/e32-1.2.tar.gz
@@ -16,7 +20,7 @@ make
 If you don't want the tarball you could build using the GNU Autotools.
 
 ```
-./autogen.sh
+./autogen.sh # this creates the configure script and Makefiles
 ./configure
 make
 ```
