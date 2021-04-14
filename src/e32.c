@@ -94,10 +94,12 @@ e32_init_gpio(struct options *opts, struct E32 *dev)
 }
 
 static int
-e32_init_uart(struct E32 *dev)
+e32_init_uart(struct E32 *dev, char *tty_name)
 {
-  dev->uart_fd = uart_open();
-  return dev->uart_fd;
+  int ret;
+
+  ret = tty_open(tty_name, &dev->uart_fd, &dev->tty);
+  return ret;
 }
 
 static int
@@ -130,7 +132,7 @@ e32_init(struct E32 *dev, struct options *opts)
   if(ret)
     return ret;
 
-  ret = e32_init_uart(dev);
+  ret = e32_init_uart(dev, opts->tty_name);
   if(ret == -1)
     return ret;
 
@@ -243,7 +245,6 @@ e32_cmd_read_settings(struct E32 *dev)
 {
   ssize_t bytes;
   const uint8_t cmd[3] = {0xC1, 0xC1, 0xC1};
-  uint8_t *buf_ptr;
 
   if(dev->verbose)
     debug_output("writing settings command\n");
@@ -253,18 +254,17 @@ e32_cmd_read_settings(struct E32 *dev)
    return -1;
 
   if(dev->verbose)
-    debug_output("reading settings command\n");
+    debug_output("reading settings\n");
 
-  bytes = 0;
-  buf_ptr = dev->settings;
-  do
+  // set a .5 second timout
+  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 5);
+
+  bytes = read(dev->uart_fd, dev->settings, 6);
+  if(bytes == 0)
   {
-    bytes += read(dev->uart_fd, buf_ptr, 1);
-    buf_ptr += (bytes != 0);
-    if(bytes == -1)
-      return -1;
+    err_output("timed out\n");
+    return -3;
   }
-  while(bytes < 6);
 
   if(dev->settings[0] != 0xC0 && dev->settings[0] != 0xC2)
     return -2;
@@ -473,7 +473,6 @@ e32_cmd_read_version(struct E32 *dev)
 {
   ssize_t bytes;
   const uint8_t cmd[3] = {0xC3, 0xC3, 0xC3};
-  uint8_t *buf;
 
   if(dev->verbose)
     debug_output("writing version command\n");
@@ -485,16 +484,15 @@ e32_cmd_read_version(struct E32 *dev)
   if(dev->verbose)
     debug_output("reading version\n");
 
-  bytes = 0;
-  buf = dev->version;
-  do
+  // set a .5 second timout
+  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 5);
+
+  bytes = read(dev->uart_fd, dev->version, 4);
+  if(bytes == 0)
   {
-    bytes += read(dev->uart_fd, buf, 1);
-    buf += (bytes != 0);
-    if(bytes == -1)
-      return -1;
+    err_output("timed out\n");
+    return -3;
   }
-  while(bytes < 4);
 
   if(dev->version[0] != 0xC3)
   {
@@ -652,6 +650,8 @@ e32_poll(struct E32 *dev, struct options *opts)
 
   tty = isatty(fileno(stdin));
 
+  tty_set_read_polling(dev->uart_fd, &dev->tty);
+
   // used for stdin or a pipe
   pfd[0].fd = -1;
   pfd[0].events = 0;
@@ -690,7 +690,11 @@ e32_poll(struct E32 *dev, struct options *opts)
     pfd[3].events = POLLIN;
   }
 
-  info_output("waiting for input\n");
+  if(tty)
+  {
+    info_output("waiting for input from terminal\n");
+  }
+
   loop = 1;
   while(loop)
   {

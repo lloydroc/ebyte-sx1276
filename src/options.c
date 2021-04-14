@@ -6,25 +6,25 @@ int use_syslog = 0;
 void
 usage(char *progname)
 {
-  printf("Usage: %s [OPTIONS]\n\n", progname);
-  printf("A command line tool to interact E32.\n");
+  printf("Usage: %s [OPTIONS]\n", progname);
+  printf("Version %s\n\n", VERSION);
+  printf("A command line tool to transmit and receive data from the EByte e32 LORA Module. If this tool is run without options the e32 will transmit what is sent from the keyboard - stdin and will output what is received to stdout. Hit return to send the message. To test a connection between two e32 boards run a %s -s on both to ensure status information is correct and matching. Once the status is deemed compatible on both e32 modules then run %s without options on both. On the first type something and hit enter, which will transmit from one e32 to the other and you should see this message show up on second e32.\n\n", progname, progname);
   printf("OPTIONS:\n\
--h --help                     Print help\n\
--r --reset                    SW Reset\n\
--t --test                     Perform a test\n\
--v --verbose                  Verbose Output\n\
--s --status                   Get status model, frequency, address, channel, data rate, baud, parity and transmit power.\n\
--m --mode MODE                Set mode to normal, wake-up, power-save or sleep.\n\
-   --m0                       GPIO M0 Pin for output\n\
-   --m1                       GPIO M1 Pin for output\n\
-   --aux                      GPIO Aux Pin for input interrupt\n\
-   --in-file  FILENAME        Read intput from a File\n\
-   --out-file FILENAME        Write output to a File\n\
--x --socket-unix FILENAME     Send and Receive data from a Unix Domain Socket\n\
--b --binary                   Used with the -f and -u options for binary output\n\
--d --daemon                   Run as a Daemon\n\
+-h --help                  Print help\n\
+-r --reset                 SW Reset\n\
+-t --test                  Perform a test\n\
+-v --verbose               Verbose Output\n\
+-s --status                Get status model, frequency, address, channel, data rate, baud, parity and transmit power.\n\
+-y --tty                   The UART to use. Defaults to /dev/ttyAMA0\n\
+-m --mode MODE             Set mode to normal, wake-up, power-save or sleep.\n\
+   --m0                    GPIO M0 Pin for output\n\
+   --m1                    GPIO M1 Pin for output\n\
+   --aux                   GPIO Aux Pin for input interrupt\n\
+   --in-file  FILENAME     Read intput from a File\n\
+   --out-file FILENAME     Write output to a File\n\
+-x --socket-unix FILENAME  Send and Receive data from a Unix Domain Socket\n\
+-d --daemon                Run as a Daemon\n\
 ");
-  printf("\nVersion: %s\n", PACKAGE_VERSION);
 }
 
 void
@@ -46,6 +46,7 @@ options_init(struct options *opts)
   opts->input_file = NULL;
   opts->output_file = NULL;
   opts->fd_socket_unix = -1;
+  snprintf(opts->tty_name, 64, "/dev/ttyAMA0");
 }
 
 int
@@ -103,7 +104,7 @@ options_open_socket_unix(struct options *opts, char *optarg)
 
   if(strlen(optarg) > sizeof(opts->socket_unix_server.sun_path)-1)
   {
-    err_output("socket path too long must be %d chars\n", sizeof(opts->socket_unix_server.sun_path-1));
+    err_output("socket path too long must be %d chars\n", sizeof(opts->socket_unix_server.sun_path)-1);
     return 2;
   }
 
@@ -147,6 +148,7 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"test",                     no_argument, 0, 't'},
     {"verbose",                  no_argument, 0, 'v'},
     {"status",                   no_argument, 0, 's'},
+    {"tty",                required_argument, 0, 'y'},
     {"mode",               required_argument, 0, 'm'},
     {"m0",                 required_argument, 0,   0},
     {"m1",                 required_argument, 0,   0},
@@ -162,7 +164,7 @@ options_parse(struct options *opts, int argc, char *argv[])
   while(1)
   {
     option_index = 0;
-    c = getopt_long(argc, argv, "hrtvsm:f:bdx:", long_options, &option_index);
+    c = getopt_long(argc, argv, "hrtvsy:m:bdx:", long_options, &option_index);
 
     if(c == -1)
       break;
@@ -178,6 +180,8 @@ options_parse(struct options *opts, int argc, char *argv[])
         strncpy(outfile, optarg, BUF);
       else if(strcmp("in-file", long_options[option_index].name) == 0)
         strncpy(infile, optarg, BUF);
+      else if(strcmp("tty", long_options[option_index].name) == 0)
+        strncpy(opts->tty_name, optarg, 64);
       break;
     case 'h':
       opts->help = 1;
@@ -194,16 +198,18 @@ options_parse(struct options *opts, int argc, char *argv[])
     case 's':
       opts->status = 1;
       break;
+    case 'y':
+      strncpy(opts->tty_name, optarg, 64);
+      break;
     case 'm':
       opts->mode = options_get_mode(optarg);
       if(opts->mode == -1)
+      {
         ret |= 1;
+      }
       break;
     case 'x':
       strncpy(sockunix, optarg, BUF);
-      break;
-    case 'b':
-      opts->binary = 1;
       break;
     case 'd':
       opts->daemon = 1;

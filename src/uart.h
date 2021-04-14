@@ -5,6 +5,11 @@
 #include <string.h>
 #include "error.h"
 
-#define UART0 "/dev/ttyAMA0"
+int
+tty_set_read_polling(int fd, struct termios *tty);
 
-int uart_open();
+int
+tty_set_read_with_timeout(int fd, struct termios *tty, int deciseconds);
+
+int
+tty_open(char *pty_name, int *tty_fd, struct termios *tty);

@@ -33,12 +33,12 @@ struct options
   int daemon;
   int input_standard;
   int output_standard;
+  char tty_name[64];
   FILE* input_file;
   FILE* output_file;
   struct sockaddr_in socket_udp_dest;
   int fd_socket_unix;
   struct sockaddr_un socket_unix_server;
-  int binary;
 };
 
 void
