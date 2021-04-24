@@ -23,12 +23,12 @@ gpio_permissions_valid()
     if(ret)
         errno_output("unable to GPIO on %s\n", GPIO_EXPORT_PATH);
 
+    // file has same uid as the user and has write privledges
+    if(uid == statbuf.st_uid && (statbuf.st_mode & S_IWUSR))
+      return 0;
+
     for(int i=0;i<ngroups;i++)
     {
-        // file has same uid as the user and has write privledges
-        if(uid == statbuf.st_uid && (statbuf.st_mode & S_IWUSR))
-            return 0;
-
         // user is in file's group and has write permissions
         if(groups[i] == statbuf.st_gid && (statbuf.st_mode & S_IWGRP))
             return 0;
