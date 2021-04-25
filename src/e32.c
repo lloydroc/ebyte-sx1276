@@ -255,7 +255,7 @@ e32_read_uart(struct E32* dev, uint8_t buf[], int n_bytes)
 
   do
   {
-    bytes = read(dev->uart_fd, buf, n_bytes);
+    bytes = read(dev->uart_fd, ptr, n_bytes);
     if(bytes == 0)
     {
       errno_output("timed out\n");
@@ -268,7 +268,7 @@ e32_read_uart(struct E32* dev, uint8_t buf[], int n_bytes)
     }
 
     total_bytes += bytes;
-    if(total_bytes < n_bytes)
+    if(total_bytes > n_bytes)
     {
       err_output("overrun expected %d bytes but read %d\n", n_bytes, total_bytes);
       return 3;

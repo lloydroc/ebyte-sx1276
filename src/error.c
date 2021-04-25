@@ -85,7 +85,7 @@ err_output(const char *format, ...)
 static void
 output_errno(int err, const char *format, va_list ap)
 {
-  char buf[BUF_SIZE], userMsg[BUF_SIZE], errText[BUF_SIZE];
+  char buf[3*BUF_SIZE], userMsg[BUF_SIZE], errText[BUF_SIZE];
 
   vsnprintf(userMsg, BUF_SIZE, format, ap);
 
@@ -93,7 +93,7 @@ output_errno(int err, const char *format, va_list ap)
           (err > 0 && err <= MAX_ENAME) ?
           ename[err] : "?UNKNOWN?", strerror(err));
 
-  snprintf(buf, BUF_SIZE, "ERROR%s %s\n", errText, userMsg);
+  snprintf(buf, 3*BUF_SIZE-1, "ERROR%s %s\n", errText, userMsg);
 
   if(use_syslog)
   {
