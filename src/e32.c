@@ -129,6 +129,7 @@ e32_init(struct E32 *dev, struct options *opts)
 {
   int ret;
 
+  dev->verbose = opts->verbose;
   dev->socket_list = NULL;
 
   ret = e32_init_gpio(opts, dev);
@@ -140,7 +141,6 @@ e32_init(struct E32 *dev, struct options *opts)
   if(ret == -1)
     return ret;
 
-  dev->verbose = opts->verbose;
   dev->prev_mode = -1;
 
   dev->socket_list = calloc(1, sizeof(struct List));
@@ -568,7 +568,7 @@ e32_cmd_read_version(struct E32 *dev)
 
   usleep(54000);
 
-  return bytes != 4;
+  return 0;
 }
 
 void
