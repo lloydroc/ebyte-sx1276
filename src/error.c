@@ -93,10 +93,7 @@ output_errno(int err, const char *format, va_list ap)
           (err > 0 && err <= MAX_ENAME) ?
           ename[err] : "?UNKNOWN?", strerror(err));
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-truncation"
   snprintf(buf, BUF_SIZE, "ERROR%s %s\n", errText, userMsg);
-#pragma GCC diagnostic pop
 
   if(use_syslog)
   {
