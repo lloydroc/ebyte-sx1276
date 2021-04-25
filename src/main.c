@@ -45,11 +45,6 @@ main(int argc, char *argv[])
     usage(argv[0]);
     return ret;
   }
-  else if(opts.help)
-  {
-    usage(argv[0]);
-    return EXIT_SUCCESS;
-  }
 
   ret = e32_init(&dev, &opts);
   if(ret)

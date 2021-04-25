@@ -15,7 +15,7 @@ usage(char *progname)
 -t --test                  Perform a test\n\
 -v --verbose               Verbose Output\n\
 -s --status                Get status model, frequency, address, channel, data rate, baud, parity and transmit power.\n\
--y --tty                   The UART to use. Defaults to /dev/ttyAMA0\n\
+-y --tty                   The UART to use. Defaults to /dev/serial0 the soft link\n\
 -m --mode MODE             Set mode to normal, wake-up, power-save or sleep.\n\
    --m0                    GPIO M0 Pin for output\n\
    --m1                    GPIO M1 Pin for output\n\
@@ -46,7 +46,7 @@ options_init(struct options *opts)
   opts->input_file = NULL;
   opts->output_file = NULL;
   opts->fd_socket_unix = -1;
-  snprintf(opts->tty_name, 64, "/dev/ttyAMA0");
+  snprintf(opts->tty_name, 64, "/dev/serial0");
 }
 
 int

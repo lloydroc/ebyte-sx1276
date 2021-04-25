@@ -97,8 +97,12 @@ static int
 e32_init_uart(struct E32 *dev, char *tty_name)
 {
   int ret;
-
   ret = tty_open(tty_name, &dev->uart_fd, &dev->tty);
+
+  if(dev->verbose)
+  {
+    debug_output("opened %s\n", tty_name);
+  }
   return ret;
 }
 
@@ -125,6 +129,7 @@ e32_init(struct E32 *dev, struct options *opts)
 {
   int ret;
 
+  dev->verbose = opts->verbose;
   dev->socket_list = NULL;
 
   ret = e32_init_gpio(opts, dev);
@@ -136,7 +141,6 @@ e32_init(struct E32 *dev, struct options *opts)
   if(ret == -1)
     return ret;
 
-  dev->verbose = opts->verbose;
   dev->prev_mode = -1;
 
   dev->socket_list = calloc(1, sizeof(struct List));
@@ -240,10 +244,50 @@ e32_deinit(struct E32 *dev, struct options* opts)
   return ret;
 }
 
+static int
+e32_read_uart(struct E32* dev, uint8_t buf[], int n_bytes)
+{
+  int bytes, total_bytes;
+  uint8_t *ptr;
+
+  bytes = total_bytes = 0;
+  ptr = buf;
+
+  do
+  {
+    bytes = read(dev->uart_fd, ptr, n_bytes);
+    if(bytes == 0)
+    {
+      errno_output("timed out\n");
+      return 1;
+    }
+    else if(bytes == -1)
+    {
+      errno_output("reading uart\n");
+      return 2;
+    }
+
+    total_bytes += bytes;
+    if(total_bytes > n_bytes)
+    {
+      err_output("overrun expected %d bytes but read %d\n", n_bytes, total_bytes);
+      return 3;
+    }
+
+    ptr += bytes;
+
+  }
+  while (total_bytes < n_bytes);
+
+  return 0;
+
+}
+
 int
 e32_cmd_read_settings(struct E32 *dev)
 {
   ssize_t bytes;
+  int err;
   const uint8_t cmd[3] = {0xC1, 0xC1, 0xC1};
 
   if(dev->verbose)
@@ -258,12 +302,10 @@ e32_cmd_read_settings(struct E32 *dev)
 
   // set a .5 second timout
   tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 5);
-
-  bytes = read(dev->uart_fd, dev->settings, 6);
-  if(bytes == 0)
+  err = e32_read_uart(dev, dev->settings, sizeof(dev->settings));
+  if(err)
   {
-    err_output("timed out\n");
-    return -3;
+    return err;
   }
 
   if(dev->settings[0] != 0xC0 && dev->settings[0] != 0xC2)
@@ -472,6 +514,7 @@ int
 e32_cmd_read_version(struct E32 *dev)
 {
   ssize_t bytes;
+  int err;
   const uint8_t cmd[3] = {0xC3, 0xC3, 0xC3};
 
   if(dev->verbose)
@@ -487,11 +530,10 @@ e32_cmd_read_version(struct E32 *dev)
   // set a .5 second timout
   tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 5);
 
-  bytes = read(dev->uart_fd, dev->version, 4);
-  if(bytes == 0)
+  err = e32_read_uart(dev, dev->version, sizeof(dev->version));
+  if(err)
   {
-    err_output("timed out\n");
-    return -3;
+    return err;
   }
 
   if(dev->version[0] != 0xC3)
@@ -526,7 +568,7 @@ e32_cmd_read_version(struct E32 *dev)
 
   usleep(54000);
 
-  return bytes != 4;
+  return 0;
 }
 
 void
