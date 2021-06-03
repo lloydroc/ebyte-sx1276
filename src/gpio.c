@@ -52,7 +52,7 @@ filter(const struct dirent *name)
     fname = name->d_name;
     len = strlen(fname);
 
-    if(len < 5 || len > 6) return 0;
+    if(len < 5 || len > 7) return 0;
     if(strncmp("gpio", fname, 4)) return 0;
     if(isdigit(fname[4]) == 0) return 0;
 
@@ -107,7 +107,7 @@ gpio_export(int gpio)
 {
     int fd;
     char path[64];
-    char val[3];
+    char val[4];
 
     // check if it already exists
     sprintf(path, GPIO_DIRECTION_PATH, gpio);
@@ -181,7 +181,7 @@ gpio_check_permissions_bug(char *path)
 int
 gpio_get_direction(int gpio, int *input)
 {
-    char path[33];
+    char path[64];
     char *ret;
     FILE* dir;
     char direction[4];
@@ -221,7 +221,7 @@ gpio_get_direction(int gpio, int *input)
 int
 gpio_set_direction(int gpio, int input)
 {
-    char path[33];
+    char path[64];
     char val[4];
     int fd;
 
@@ -279,7 +279,7 @@ gpio_open(int gpio)
 int
 gpio_set_edge(int gpio, int edge)
 {
-    char path[33];
+    char path[64];
     char val[16];
     int fd;
 
@@ -319,7 +319,7 @@ gpio_set_edge(int gpio, int edge)
 int
 gpio_get_edge(int gpio, int *edge)
 {
-    char path[33];
+    char path[64];
     char *ret;
     FILE* dir;
     char edge_buf[16];
@@ -403,7 +403,7 @@ gpio_unexport(int gpio)
 {
     int fd;
     char path[64];
-    char val[3];
+    char val[4];
 
     sprintf(path, GPIO_UNEXPORT_PATH);
     sprintf(val, "%d", gpio);
