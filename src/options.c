@@ -6,6 +6,8 @@ int use_syslog = 0;
 void
 usage(char *progname)
 {
+  struct options opts;
+  options_init(&opts);
   printf("Usage: %s [OPTIONS]\n", progname);
   printf("Version %s\n\n", VERSION);
   printf("A command line tool to transmit and receive data from the EByte e32 LORA Module. If this tool is run without options the e32 will transmit what is sent from the keyboard - stdin and will output what is received to stdout. Hit return to send the message. To test a connection between two e32 boards run a %s -s on both to ensure status information is correct and matching. Once the status is deemed compatible on both e32 modules then run %s without options on both. On the first type something and hit enter, which will transmit from one e32 to the other and you should see this message show up on second e32.\n\n", progname, progname);
@@ -17,14 +19,14 @@ usage(char *progname)
 -s --status                Get status model, frequency, address, channel, data rate, baud, parity and transmit power.\n\
 -y --tty                   The UART to use. Defaults to /dev/serial0 the soft link\n\
 -m --mode MODE             Set mode to normal, wake-up, power-save or sleep.\n\
-   --m0                    GPIO M0 Pin for output\n\
-   --m1                    GPIO M1 Pin for output\n\
-   --aux                   GPIO Aux Pin for input interrupt\n\
+   --m0                    GPIO M0 Pin for output [%d]\n\
+   --m1                    GPIO M1 Pin for output [%d]\n\
+   --aux                   GPIO Aux Pin for input interrupt [%d]\n\
    --in-file  FILENAME     Read intput from a File\n\
    --out-file FILENAME     Write output to a File\n\
 -x --socket-unix FILENAME  Send and Receive data from a Unix Domain Socket\n\
 -d --daemon                Run as a Daemon\n\
-");
+", opts.gpio_m0, opts.gpio_m1, opts.gpio_aux);
 }
 
 void
@@ -36,10 +38,25 @@ options_init(struct options *opts)
   opts->verbose = 0;
   opts->status = 0;
   opts->mode = -1;
-  opts->uart_dev = 0;
-  opts->gpio_m0 = 23;
-  opts->gpio_m1 = 24;
-  opts->gpio_aux = 18;
+
+#ifdef GPIO_M0_PIN
+  opts->gpio_m0 = GPIO_M0_PIN;
+#else
+  opts->gpio_m0 = _GPIO_M0_PIN;
+#endif
+
+#ifdef GPIO_M1_PIN
+  opts->gpio_m1 = GPIO_M1_PIN;
+#else
+  opts->gpio_m1 = _GPIO_M1_PIN;
+#endif
+
+#ifdef GPIO_AUX_PIN
+  opts->gpio_aux = GPIO_AUX_PIN;
+#else
+  opts->gpio_aux = _GPIO_AUX_PIN;
+#endif
+
   opts->daemon = 0;
   opts->input_standard = 1;
   opts->output_standard = 1;
@@ -47,6 +64,21 @@ options_init(struct options *opts)
   opts->output_file = NULL;
   opts->fd_socket_unix = -1;
   snprintf(opts->tty_name, 64, "/dev/serial0");
+}
+
+void
+options_print(struct options* opts)
+{
+  printf("option reset is %d\n", opts->reset);
+  printf("option help is %d\n", opts->help);
+  printf("option verbose is %d\n", opts->verbose);
+  printf("option status is %d\n", opts->status);
+  printf("option mode is %d\n", opts->mode);
+  printf("option GPIO M0 Pin is %d\n", opts->gpio_m0);
+  printf("option GPIO M1 Pin is %d\n", opts->gpio_m1);
+  printf("option GPIO AUX Pin is %d\n", opts->gpio_aux);
+  printf("option daemon %d\n", opts->daemon);
+  printf("option TTY Name is %s\n", opts->tty_name);
 }
 
 int
@@ -172,6 +204,8 @@ options_parse(struct options *opts, int argc, char *argv[])
     switch(c)
     {
     case 0:
+      if(strcmp("m0", long_options[option_index].name) == 0)
+        opts->gpio_m0 = atoi(optarg);
       if(strcmp("m1", long_options[option_index].name) == 0)
         opts->gpio_m1 = atoi(optarg);
       else if(strcmp("aux", long_options[option_index].name) == 0)
