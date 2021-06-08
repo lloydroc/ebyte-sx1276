@@ -1,7 +1,7 @@
 AC_INIT([e32], [1.4], [lloyd@lloydrochester.com])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
-AC_CONFIG_SRCDIR([config.h.in])
+AC_CONFIG_SRCDIR([src/config.h.in])
 AC_CONFIG_HEADERS([src/config.h])
 
 AC_DEFINE(_GPIO_M0_PIN, [23], [Default GPIO Pin for E32 Mode 0 Input])
