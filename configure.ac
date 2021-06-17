@@ -1,4 +1,4 @@
-AC_INIT([e32], [1.4], [lloyd@lloydrochester.com])
+AC_INIT([e32], [1.5], [lloyd@lloydrochester.com])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
 AC_CONFIG_SRCDIR([src/config.h.in])
