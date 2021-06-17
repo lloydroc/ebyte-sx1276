@@ -1,4 +1,4 @@
-#include "../config.h"
+#include "config.h"
 #include <stdio.h>
 
 #include <signal.h>
@@ -31,7 +31,7 @@ void signal_handler(int sig)
 int
 main(int argc, char *argv[])
 {
-  int ret = 0;
+  int err = 0;
 
   if (signal(SIGINT, signal_handler) == SIG_ERR)
     err_output("installing SIGNT signal handler");
@@ -39,20 +39,25 @@ main(int argc, char *argv[])
     err_output("installing SIGTERM signal handler");
 
   options_init(&opts);
-  ret = options_parse(&opts, argc, argv);
-  if(ret || opts.help)
+  err = options_parse(&opts, argc, argv);
+  if(err || opts.help)
   {
     usage(argv[0]);
-    return ret;
+    return err;
   }
 
-  ret = e32_init(&dev, &opts);
-  if(ret)
+  if(opts.verbose)
+  {
+    options_print(&opts);
+  }
+
+  err = e32_init(&dev, &opts);
+  if(err)
     goto cleanup;
 
   if(opts.mode != -1)
   {
-    ret |= e32_set_mode(&dev, opts.mode);
+    err |= e32_set_mode(&dev, opts.mode);
     goto cleanup;
   }
 
@@ -65,9 +70,9 @@ main(int argc, char *argv[])
   }
   if(opts.reset)
   {
-    ret |= e32_set_mode(&dev, 3);
-    ret |= e32_cmd_reset(&dev);
-    ret |= e32_set_mode(&dev, 0);
+    err |= e32_set_mode(&dev, 3);
+    err |= e32_cmd_reset(&dev);
+    err |= e32_set_mode(&dev, 0);
     goto cleanup;
   }
   if(opts.status)
@@ -102,11 +107,11 @@ main(int argc, char *argv[])
     info_output("daemon started pid=%d", getpid());
   }
 
-  ret |= e32_poll(&dev, &opts);
-  if(ret)
-    err_output("error polling %d", ret);
+  err |= e32_poll(&dev, &opts);
+  if(err)
+    err_output("error polling %d", err);
 cleanup:
-  ret |= e32_deinit(&dev, &opts);
+  err |= e32_deinit(&dev, &opts);
 
-  return ret;
+  return err;
 }
