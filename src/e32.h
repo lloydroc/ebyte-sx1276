@@ -9,7 +9,7 @@
 #include "uart.h"
 #include "list.h"
 
-#define E32_TX_BUF_BYTES 58
+#define E32_TX_BUF_BYTES 512
 
 enum E32_mode
 {
@@ -30,11 +30,12 @@ struct E32
 {
   enum E32_state state;
   int verbose;
-  int gpio_m0_fd;
-  int gpio_m1_fd;
-  int gpio_aux_fd;
+  int fd_gpio_m0;
+  int fd_gpio_m1;
+  int fd_gpio_aux;
   int uart_fd;
   struct termios tty;
+  int isatty;
   int prev_mode;
   int mode;
   uint8_t version[4];
@@ -91,7 +92,7 @@ e32_cmd_reset(struct E32 *dev);
 int
 e32_cmd_write_settings(struct E32 *dev);
 
-int
+ssize_t
 e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len);
 
 int

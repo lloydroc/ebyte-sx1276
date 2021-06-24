@@ -22,9 +22,9 @@ usage(char *progname)
    --m0                    GPIO M0 Pin for output [%d]\n\
    --m1                    GPIO M1 Pin for output [%d]\n\
    --aux                   GPIO Aux Pin for input interrupt [%d]\n\
-   --in-file  FILENAME     Read intput from a File\n\
-   --out-file FILENAME     Write output to a File\n\
--x --socket-unix FILENAME  Send and Receive data from a Unix Domain Socket\n\
+   --in-file  FILENAME     Transmit a file\n\
+   --out-file FILENAME     Write received output to a file\n\
+-x --socket-unix FILENAME  Send and receive data from a Unix Domain Socket\n\
 -d --daemon                Run as a Daemon\n\
 ", opts.gpio_m0, opts.gpio_m1, opts.gpio_aux);
 }
@@ -84,18 +84,18 @@ options_print(struct options* opts)
 int
 options_deinit(struct options *opts)
 {
-  int ret;
-  ret = 0;
+  int err;
+  err = 0;
   if(opts->daemon)
     closelog();
 
   if(opts->output_file)
-    ret |= fclose(opts->output_file);
+    err |= fclose(opts->output_file);
 
   if(opts->fd_socket_unix != -1)
     close(opts->fd_socket_unix);
 
-  return ret;
+  return err;
 }
 
 static int
@@ -163,7 +163,7 @@ options_parse(struct options *opts, int argc, char *argv[])
 {
   int c;
   int option_index;
-  int ret = 0;
+  int err = 0;
 #define BUF 128
   char infile[BUF];
   char outfile[BUF];
@@ -239,7 +239,7 @@ options_parse(struct options *opts, int argc, char *argv[])
       opts->mode = options_get_mode(optarg);
       if(opts->mode == -1)
       {
-        ret |= 1;
+        err |= 1;
       }
       break;
     case 'x':
@@ -262,18 +262,18 @@ options_parse(struct options *opts, int argc, char *argv[])
   }
 
   if(strnlen(sockunix, BUF))
-    ret |= options_open_socket_unix(opts, sockunix);
+    err |= options_open_socket_unix(opts, sockunix);
 
   if(strnlen(infile, BUF))
   {
     opts->input_file = options_open_file(infile, "r");
-    ret |= opts->input_file == NULL;
+    err |= opts->input_file == NULL;
   }
 
   if(strnlen(outfile, BUF))
   {
     opts->output_file = options_open_file(outfile, "w");
-    ret |= opts->output_file == NULL;
+    err |= opts->output_file == NULL;
   }
 
   if(opts->input_file != NULL)
@@ -282,14 +282,14 @@ options_parse(struct options *opts, int argc, char *argv[])
   if(opts->output_file != NULL)
     opts->output_standard = 0;
 
-  // TODO fix this section if user passes in arguments without options
   if (optind < argc)
   {
     err_output("non-option ARGV-elements: ");
     while (optind < argc)
       err_output("%s ", argv[optind++]);
     err_output("");
+    err |= 1;
   }
 
-  return ret;
+  return err;
 }
