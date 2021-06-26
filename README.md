@@ -19,9 +19,9 @@ We're going to assume you have 2 E32 Modules attached to two Raspberry PIs. Thus
 ## Install the `e32` command line tool and get status
 
 ```
-wget http://lloydrochester.com/code/e32-1.4.tar.gz
-tar zxf e32-1.4.tar.gz
-cd e32-1.4
+wget http://lloydrochester.com/code/e32-1.6.tar.gz
+tar zxf e32-1.6.tar.gz
+cd e32-1.6
 ./configure
 make
 sudo make install
