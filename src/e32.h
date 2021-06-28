@@ -13,10 +13,10 @@
 
 enum E32_mode
 {
-  normal,
-  wake_up,
-  power_save,
-  sleep_mode
+  NORMAL,
+  WAKE_UP,
+  POWER_SAVE,
+  SLEEP
 };
 
 enum E32_state
@@ -90,7 +90,7 @@ int
 e32_cmd_reset(struct E32 *dev);
 
 int
-e32_cmd_write_settings(struct E32 *dev);
+e32_cmd_write_settings(struct E32 *dev, struct options *opts);
 
 ssize_t
 e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len);
@@ -99,6 +99,6 @@ int
 e32_receive(struct E32 *dev, uint8_t *buf, size_t buf_len);
 
 int
-e32_poll(struct E32 *dev, struct options* opts);
+e32_poll(struct E32 *dev, struct options *opts);
 
 #endif

@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 #include "error.h"
 
 extern int use_syslog;
@@ -33,6 +34,7 @@ struct options
   int input_standard;
   int output_standard;
   char tty_name[64];
+  uint8_t settings_write_input[6];
   FILE* input_file;
   FILE* output_file;
   struct sockaddr_in socket_udp_dest;
@@ -51,6 +53,9 @@ options_deinit(struct options *opts);
 
 int
 options_parse(struct options *opts, int argc, char *argv[]);
+
+int
+options_parse_settings(struct options *opts, char *settings);
 
 void
 options_print(struct options *opts);

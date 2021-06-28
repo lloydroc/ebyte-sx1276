@@ -304,7 +304,7 @@ e32_cmd_read_settings(struct E32 *dev)
     debug_output("reading settings\n");
 
   // set a .5 second timout
-  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 5);
+  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 50);
   err = e32_read_uart(dev, dev->settings, sizeof(dev->settings));
   if(err)
   {
@@ -380,9 +380,7 @@ e32_cmd_read_settings(struct E32 *dev)
       dev->air_data_rate = 0;
   }
 
-  dev->channel = dev->settings[4] & 0b11100000;
-  dev->channel >>= 5;
-  dev->channel += 410;
+  dev->channel = dev->settings[4] & 0b00011111;
 
   dev->transmission_mode = dev->settings[5] & 0b10000000;
   dev->transmission_mode >>= 7;
@@ -485,7 +483,8 @@ e32_print_settings(struct E32 *dev)
 
   info_output("UART Baud Rate:           %d bps\n", dev->uart_baud);
   info_output("Air Data Rate:            %d bps\n", dev->air_data_rate);
-  info_output("Channel:                  %d MHz\n", dev->channel);
+  info_output("Channel:                  %d\n", dev->channel);
+  info_output("Frequency                 %d MHz\n", dev->channel+410);
 
   if(dev->transmission_mode)
     info_output("Transmission Mode:        Transparent\n");
@@ -531,7 +530,7 @@ e32_cmd_read_version(struct E32 *dev)
     debug_output("reading version\n");
 
   // set a .5 second timout
-  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 5);
+  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 50);
 
   err = e32_read_uart(dev, dev->version, sizeof(dev->version));
   if(err)
@@ -600,9 +599,52 @@ e32_cmd_reset(struct E32 *dev)
 }
 
 int
-e32_cmd_write_settings(struct E32 *dev)
+e32_cmd_write_settings(struct E32 *dev, struct options *opts)
 {
-  return -1;
+  int err;
+  ssize_t bytes;
+  uint8_t orig_settings[6];
+
+  err = 0;
+  if(e32_cmd_read_settings(dev))
+  {
+    err_output("unable to read settings before setting them");
+    return 1;
+  }
+
+  memcpy(orig_settings, dev->settings, sizeof(dev->settings));
+
+  info_output("original settings 0x");
+  for(int i=0; i<6; i++)
+    info_output("%x", orig_settings[i]);
+  info_output("\n");
+
+  info_output("writing settings 0x");
+  for(int i=0; i<6; i++)
+    info_output("%x", opts->settings_write_input[i]);
+  info_output("\n");
+
+  if(dev->verbose)
+    debug_output("writing settings command\n");
+
+  bytes = write(dev->uart_fd, opts->settings_write_input, 6);
+  if(bytes == -1)
+   return -1;
+
+  usleep(80000);
+
+  if(e32_cmd_read_settings(dev))
+  {
+    err_output("unable to read settings after setting them\n");
+    return 1;
+  }
+
+  info_output("read settings 0x");
+  for(int i=0; i<6; i++)
+    info_output("%x", dev->settings[i]);
+  info_output("\n");
+
+  return err;
 }
 
 ssize_t
@@ -733,7 +775,7 @@ e32_poll_init(struct E32 *dev, struct options *opts, struct pollfd pfd[])
   if(dev->isatty)
   {
     dev->isatty = 1;
-    info_output("waiting for input from terminal\n");
+    info_output("waiting for input from the terminal\n");
   }
     // used for stdin or a pipe
   pfd[0].fd = -1;

@@ -1,4 +1,4 @@
-AC_INIT([e32], [1.6], [lloyd@lloydrochester.com])
+AC_INIT([e32], [1.7], [lloyd@lloydrochester.com])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
 AC_CONFIG_SRCDIR([src/config.h.in])
@@ -48,5 +48,6 @@ AM_CONDITIONAL([HAVE_SYSTEMD], [test "x$with_systemdsystemunitdir" != "xno"])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
-                 systemd/Makefile])
+                 systemd/Makefile
+                 test/Makefile])
 AC_OUTPUT
