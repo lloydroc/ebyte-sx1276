@@ -45,9 +45,10 @@ m4/lt~obsolete.m4(LIBDL)
 Makefile
 src/Makefile
 *.o
-src/.deps
+.deps
 config.h
 tags
 e32
 \#*#
 \.\#*
+.vscode

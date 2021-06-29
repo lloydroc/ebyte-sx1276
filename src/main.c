@@ -70,18 +70,24 @@ main(int argc, char *argv[])
   }
   if(opts.reset)
   {
-    err |= e32_set_mode(&dev, 3);
+    err |= e32_set_mode(&dev, SLEEP);
     err |= e32_cmd_reset(&dev);
-    err |= e32_set_mode(&dev, 0);
+    err |= e32_set_mode(&dev, NORMAL);
     goto cleanup;
   }
-  if(opts.status)
+
+  /* must be in sleep mode to read or write settings */
+  if(opts.status || opts.settings_write_input[0])
   {
-    if(e32_set_mode(&dev, 3))
+    if(e32_set_mode(&dev, SLEEP))
     {
       err_output("unable to go to sleep mode\n");
       goto cleanup;
     }
+  }
+
+  if(opts.status)
+  {
     if(e32_cmd_read_version(&dev))
     {
       err_output("unable to read version\n");
@@ -92,16 +98,24 @@ main(int argc, char *argv[])
       err_output("unable to read settings\n");
       goto cleanup;
     }
-    if(e32_set_mode(&dev, 0))
-    {
-      err_output("unable to go to normal mode\n");
-      goto cleanup;
-    }
     e32_print_version(&dev);
     e32_print_settings(&dev);
     goto cleanup;
   }
-  else if(opts.daemon)
+
+  if(opts.settings_write_input[0])
+  {
+    err |= e32_cmd_write_settings(&dev, &opts);
+  }
+
+  /* switch back to normal mode for tx/rx */
+  if(e32_set_mode(&dev, NORMAL))
+  {
+    err_output("unable to go to normal mode\n");
+    goto cleanup;
+  }
+
+  if(opts.daemon)
   {
     become_daemon();
     info_output("daemon started pid=%d", getpid());

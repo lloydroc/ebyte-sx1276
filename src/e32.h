@@ -9,14 +9,27 @@
 #include "uart.h"
 #include "list.h"
 
-#define E32_TX_BUF_BYTES 512
+/*
+ The e32 has a TX buffer of 512 bytes but how the implemented it's usage
+ with the AUX pin makes things difficult. I've noticied if you write 512
+ bytes to it and then wait for AUX to go high, then write another 512 bytes
+ you will overwrite most of the 512 bytes. For example maybe the first 64
+ bytes would get transmitted then the next would be overwritten. However,
+ this seems to happen on the event the buffer is empty originally as if you
+ send 512 continuously the first 512 are dropped but the remaining would be
+ sent. This is a potential improvement but needs more consideration. The poor
+ documentation of the datasheet and how AUX is implemented makes figuring this
+ out quite difficult. For now we'll have to use 58 until a better solution
+ can be devised.
+*/
+#define E32_TX_BUF_BYTES 58
 
 enum E32_mode
 {
-  normal,
-  wake_up,
-  power_save,
-  sleep_mode
+  NORMAL,
+  WAKE_UP,
+  POWER_SAVE,
+  SLEEP
 };
 
 enum E32_state
@@ -90,7 +103,7 @@ int
 e32_cmd_reset(struct E32 *dev);
 
 int
-e32_cmd_write_settings(struct E32 *dev);
+e32_cmd_write_settings(struct E32 *dev, struct options *opts);
 
 ssize_t
 e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len);
@@ -99,6 +112,6 @@ int
 e32_receive(struct E32 *dev, uint8_t *buf, size_t buf_len);
 
 int
-e32_poll(struct E32 *dev, struct options* opts);
+e32_poll(struct E32 *dev, struct options *opts);
 
 #endif
