@@ -86,6 +86,7 @@ options_print(struct options* opts)
   printf("option TTY Name is %s\n", opts->tty_name);
   if(opts->settings_write_input[0])
   {
+    printf("option write settings is: ");
     for(int i=0;i<6;i++)
       printf("%x", opts->settings_write_input[i]);
     puts("");

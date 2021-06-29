@@ -304,7 +304,7 @@ e32_cmd_read_settings(struct E32 *dev)
     debug_output("reading settings\n");
 
   // set a .5 second timout
-  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 50);
+  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 5);
   err = e32_read_uart(dev, dev->settings, sizeof(dev->settings));
   if(err)
   {
@@ -530,7 +530,7 @@ e32_cmd_read_version(struct E32 *dev)
     debug_output("reading version\n");
 
   // set a .5 second timout
-  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 50);
+  tty_set_read_with_timeout(dev->uart_fd, &dev->tty, 5);
 
   err = e32_read_uart(dev, dev->version, sizeof(dev->version));
   if(err)

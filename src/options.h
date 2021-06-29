@@ -1,10 +1,8 @@
 #ifndef OPTIONS_H
 #define OPTIONS_H
 #include "config.h"
-#include <arpa/inet.h>
 #include <getopt.h>
 #include <netinet/in.h>
-#include <netdb.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -14,7 +12,6 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <arpa/inet.h>
 #include "error.h"
 
 extern int use_syslog;
