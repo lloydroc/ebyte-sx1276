@@ -1,4 +1,4 @@
-# EByte E32 SX1276 for the Raspberry Pi
+# EByte E32 SX1276 Software for the Raspberry Pi
 
 See this [Blog Post](https://lloydrochester.com/post/hardware/e32-sx1276-lora/) for details.
 
@@ -67,3 +67,7 @@ If you don't want the tarball you could build using the GNU Autotools.
 ./configure
 make
 ```
+
+## Changing e32 settings
+
+We can use the `-w HEX` options to change settings. For example we could save the settings by doing a `e32 -w C000001A1744`. See the datasheet for each of these options. For the form XXYYYY1AZZ44. If XX=C0 parameters are saved to e32's EEPROM, if XX=C2 settings will be lost on power cycle. The address is represented by YYYY and the channel is represented by ZZ.

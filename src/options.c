@@ -17,7 +17,10 @@ usage(char *progname)
 -t --test                  Perform a test\n\
 -v --verbose               Verbose Output\n\
 -s --status                Get status model, frequency, address, channel, data rate, baud, parity and transmit power.\n\
--w --write-settings        Write settings from hex. E.G. C000001A1744\n\
+-w --write-settings HEX    Write settings from HEX. see datasheet for these 6 bytes. Example: -w C000001A1744.\n\
+                           For the form XXYYYY1AZZ44. If XX=C0 parameters are saved to e32's EEPROM, if XX=C2 settings\n\
+                           will be lost on power cycle. The address is represented by YYYY and the channel is represented\n\
+                           by ZZ.\n\
 -y --tty                   The UART to use. Defaults to /dev/serial0 the soft link\n\
 -m --mode MODE             Set mode to normal, wake-up, power-save or sleep.\n\
    --m0                    GPIO M0 Pin for output [%d]\n\

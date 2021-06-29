@@ -631,8 +631,6 @@ e32_cmd_write_settings(struct E32 *dev, struct options *opts)
   if(bytes == -1)
    return -1;
 
-  usleep(80000);
-
   if(e32_cmd_read_settings(dev))
   {
     err_output("unable to read settings after setting them\n");
