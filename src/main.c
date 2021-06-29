@@ -88,6 +88,11 @@ main(int argc, char *argv[])
 
   if(opts.status)
   {
+    if(e32_cmd_read_version(&dev))
+    {
+      err_output("unable to read version\n");
+      goto cleanup;
+    }
     if(e32_cmd_read_settings(&dev))
     {
       err_output("unable to read settings\n");
