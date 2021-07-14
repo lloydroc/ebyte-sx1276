@@ -2,6 +2,14 @@
 
 uint8_t buf[E32_TX_BUF_BYTES+1];
 
+ /* define these indices so we don't have to reference pfd[3] */
+#define PFD_STDIN 0
+#define PFD_UART 1
+#define PFD_INPUT_FILE 2
+#define PFD_SOCKET_UNIX_DATA 3
+#define PFD_GPIO_AUX 4
+#define PFD_SOCKET_UNIX_CONTROL 5
+
 static int
 e32_init_gpio(struct options *opts, struct E32 *dev)
 {
@@ -294,7 +302,7 @@ e32_cmd_read_settings(struct E32 *dev)
   const uint8_t cmd[3] = {0xC1, 0xC1, 0xC1};
 
   if(dev->verbose)
-    debug_output("writing settings command\n");
+    debug_output("sending command to read settings\n");
 
   bytes = write(dev->uart_fd, cmd, 3);
   if(bytes == -1)
@@ -599,7 +607,7 @@ e32_cmd_reset(struct E32 *dev)
 }
 
 int
-e32_cmd_write_settings(struct E32 *dev, struct options *opts)
+e32_cmd_write_settings(struct E32 *dev, uint8_t *settings)
 {
   int err;
   ssize_t bytes;
@@ -621,13 +629,10 @@ e32_cmd_write_settings(struct E32 *dev, struct options *opts)
 
   info_output("writing settings 0x");
   for(int i=0; i<6; i++)
-    info_output("%x", opts->settings_write_input[i]);
+    info_output("%x", settings[i]);
   info_output("\n");
 
-  if(dev->verbose)
-    debug_output("writing settings command\n");
-
-  bytes = write(dev->uart_fd, opts->settings_write_input, 6);
+  bytes = write(dev->uart_fd, settings, 6);
   if(bytes == -1)
    return -1;
 
@@ -704,7 +709,7 @@ e32_write_output(struct E32 *dev, struct options *opts, uint8_t* buf, const size
     if(dev->verbose)
       debug_output("sending %d bytes to socket %s", bytes, cl->sun_path);
 
-    outbytes = sendto(opts->fd_socket_unix, buf, bytes, 0, (struct sockaddr*) cl, addrlen);
+    outbytes = sendto(opts->fd_socket_unix_data, buf, bytes, 0, (struct sockaddr*) cl, addrlen);
     if(outbytes == -1)
     {
       errno_output("unable to send back status to unix socket. removing from list.");
@@ -728,20 +733,26 @@ e32_poll_input_enable(struct options *opts, struct pollfd pfd[])
 {
   if(opts->input_standard)
   {
-    pfd[0].fd = fileno(stdin);
-    pfd[0].events = POLLIN;
+    pfd[PFD_STDIN].fd = fileno(stdin);
+    pfd[PFD_STDIN].events = POLLIN;
   }
 
   if(opts->input_file)
   {
-    pfd[2].fd = fileno(opts->input_file);
-    pfd[2].events = POLLIN;
+    pfd[PFD_INPUT_FILE].fd = fileno(opts->input_file);
+    pfd[PFD_INPUT_FILE].events = POLLIN;
   }
 
-  if(opts->fd_socket_unix)
+  if(opts->fd_socket_unix_data)
   {
-    pfd[3].fd = opts->fd_socket_unix;
-    pfd[3].events = POLLIN;
+    pfd[PFD_SOCKET_UNIX_DATA].fd = opts->fd_socket_unix_data;
+    pfd[PFD_SOCKET_UNIX_DATA].events = POLLIN;
+  }
+
+  if(opts->fd_socket_unix_control)
+  {
+    pfd[PFD_SOCKET_UNIX_CONTROL].fd = opts->fd_socket_unix_control;
+    pfd[PFD_SOCKET_UNIX_CONTROL].events = POLLIN;
   }
 }
 
@@ -750,20 +761,26 @@ e32_poll_input_disable(struct options *opts, struct pollfd pfd[])
 {
   if(opts->input_standard)
   {
-    pfd[0].fd = -1;
-    pfd[0].events = 0;
+    pfd[PFD_STDIN].fd = -1;
+    pfd[PFD_STDIN].events = 0;
   }
 
   if(opts->input_file)
   {
-    pfd[2].fd = -1;
-    pfd[2].events = 0;
+    pfd[PFD_INPUT_FILE].fd = -1;
+    pfd[PFD_INPUT_FILE].events = 0;
   }
 
-  if(opts->fd_socket_unix)
+  if(opts->fd_socket_unix_data)
   {
-    pfd[3].fd = -1;
-    pfd[3].events = 0;
+    pfd[PFD_SOCKET_UNIX_DATA].fd = -1;
+    pfd[PFD_SOCKET_UNIX_DATA].events = 0;
+  }
+
+  if(opts->fd_socket_unix_control)
+  {
+    pfd[PFD_SOCKET_UNIX_CONTROL].fd = -1;
+    pfd[PFD_SOCKET_UNIX_CONTROL].events = 0;
   }
 }
 
@@ -779,36 +796,40 @@ e32_poll_init(struct E32 *dev, struct options *opts, struct pollfd pfd[])
     info_output("waiting for input from the terminal\n");
   }
     // used for stdin or a pipe
-  pfd[0].fd = -1;
-  pfd[0].events = 0;
+  pfd[PFD_STDIN].fd = -1;
+  pfd[PFD_STDIN].events = 0;
 
   // used for the uart
-  pfd[1].fd = dev->uart_fd;
-  pfd[1].events = POLLIN;
+  pfd[PFD_UART].fd = dev->uart_fd;
+  pfd[PFD_UART].events = POLLIN;
 
   // used for an input file
-  pfd[2].fd = -1;
-  pfd[2].events = 0;
+  pfd[PFD_INPUT_FILE].fd = -1;
+  pfd[PFD_INPUT_FILE].events = 0;
 
-  // used for a unix domain socket
-  pfd[3].fd = -1;
-  pfd[3].events = 0;
+  // used for a unix domain socket data
+  pfd[PFD_SOCKET_UNIX_DATA].fd = -1;
+  pfd[PFD_SOCKET_UNIX_DATA].events = 0;
 
   // poll the AUX pin for rising and falling edges
-  pfd[4].fd = dev->fd_gpio_aux;
-  pfd[4].events = POLLPRI;
+  pfd[PFD_GPIO_AUX].fd = dev->fd_gpio_aux;
+  pfd[PFD_GPIO_AUX].events = POLLPRI;
+
+  // used for a unix domain socket control
+  pfd[PFD_SOCKET_UNIX_CONTROL].fd = -1;
+  pfd[PFD_SOCKET_UNIX_CONTROL].events = 0;
 
   e32_poll_input_enable(opts, pfd);
 
 }
 
 static int
-e32_poll_stdin(struct E32 *dev, struct options *opts, struct pollfd pfd[], int *loop_continue)
+e32_poll_stdin(struct E32 *dev, struct options *opts, struct pollfd *pfd, int *loop_continue)
 {
   ssize_t bytes;
   int ready;
 
-  ready = pfd[0].revents & POLLIN;
+  ready = pfd->revents & POLLIN;
 
   if(!ready)
   {
@@ -817,10 +838,10 @@ e32_poll_stdin(struct E32 *dev, struct options *opts, struct pollfd pfd[], int *
 
   dev->state = TX;
 
-  bytes = read(pfd[0].fd, &buf, E32_TX_BUF_BYTES);
+  bytes = read(pfd->fd, &buf, E32_TX_BUF_BYTES);
   if(bytes == -1)
   {
-    errno_output("error reading from UART\n");
+    errno_output("error reading from stdin\n");
     return 1;
   }
 
@@ -842,22 +863,22 @@ e32_poll_stdin(struct E32 *dev, struct options *opts, struct pollfd pfd[], int *
 }
 
 static int
-e32_poll_uart(struct E32 *dev, struct options *opts, struct pollfd pfd[], ssize_t *total_bytes, int *loop_continue)
+e32_poll_uart(struct E32 *dev, struct options *opts, struct pollfd *pfd, ssize_t *total_bytes, int *loop_continue)
 {
   ssize_t bytes;
   int ready;
 
-  ready = pfd[1].revents & POLLIN;
+  ready = pfd->revents & POLLIN;
 
   if(!ready)
   {
     return 0;
   }
 
-  bytes = read(pfd[1].fd, buf+(*total_bytes), E32_TX_BUF_BYTES);
+  bytes = read(pfd->fd, buf+(*total_bytes), E32_TX_BUF_BYTES);
   if(bytes == -1)
   {
-    errno_output("error reading from uart\n");
+    errno_output("e32_poll_uart() error reading from uart, mode is %d\n", dev->mode);
     return 1;
   }
   else
@@ -870,12 +891,12 @@ e32_poll_uart(struct E32 *dev, struct options *opts, struct pollfd pfd[], ssize_
 }
 
 static int
-e32_poll_file(struct E32 *dev, struct options *opts, struct pollfd pfd[], int *loop_continue)
+e32_poll_file(struct E32 *dev, struct options *opts, struct pollfd *pfd, int *loop_continue)
 {
   ssize_t bytes;
   int ready;
 
-  ready = pfd[2].revents & POLLIN;
+  ready = pfd->revents & POLLIN;
 
   if(!ready)
   {
@@ -883,7 +904,7 @@ e32_poll_file(struct E32 *dev, struct options *opts, struct pollfd pfd[], int *l
   }
 
   if(opts->verbose)
-    debug_output("reading from fd %d\n", pfd[2].fd);
+    debug_output("reading from fd %d\n", pfd->fd);
 
   bytes = fread(buf, 1, E32_TX_BUF_BYTES, opts->input_file);
 
@@ -911,26 +932,25 @@ e32_poll_file(struct E32 *dev, struct options *opts, struct pollfd pfd[], int *l
 }
 
 static int
-e32_poll_socket_unix(struct E32 *dev, struct options *opts, struct pollfd pfd[], int *loop_continue)
+e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *pfd, int *loop_continue)
 {
   ssize_t bytes;
   int ready;
-  uint8_t clret; // return to socket clients
+  uint8_t client_err; // return to socket clients
   struct sockaddr_un client;
   socklen_t addrlen; // unix domain socket client address
 
-  clret = 0;
-
-  ready = pfd[3].revents & POLLIN;
+  ready = pfd->revents & POLLIN;
 
   if(!ready)
   {
     return 0;
   }
 
+  client_err = 0;
   addrlen = sizeof(struct sockaddr_un);
 
-  bytes = recvfrom(pfd[3].fd, buf, E32_TX_BUF_BYTES, 0, (struct sockaddr*) &client, &addrlen);
+  bytes = recvfrom(pfd->fd, buf, E32_TX_BUF_BYTES, 0, (struct sockaddr*) &client, &addrlen);
   if(bytes == -1)
   {
     errno_output("error receiving from unix domain socket");
@@ -940,28 +960,30 @@ e32_poll_socket_unix(struct E32 *dev, struct options *opts, struct pollfd pfd[],
   {
     err_output("overflow: datagram truncated to %d bytes", E32_TX_BUF_BYTES);
     bytes = E32_TX_BUF_BYTES;
-    clret++;
+    client_err++;
   }
 
   if(opts->verbose)
+  {
     debug_output("received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
+  }
 
   // sending 0 bytes will register and we'll add to the client list
   if(bytes == 0 && list_index_of(dev->socket_list, &client) == -1)
   {
-    if(opts->verbose)
-      debug_output("adding client %d at %s\n", list_size(dev->socket_list), client.sun_path);
-
     struct sockaddr_un *new_client;
     new_client = malloc(sizeof(struct sockaddr_un));
     memcpy(new_client, &client, sizeof(struct sockaddr_un));
     list_add_first(dev->socket_list, new_client);
+
+    if(opts->verbose)
+      debug_output("registered client %d at %s\n", list_size(dev->socket_list), client.sun_path);
   }
 
   // send back an acknowledge of 1 byte to the client
   if(bytes == 0)
   {
-    bytes = sendto(pfd[3].fd, &clret, 1, 0, (struct sockaddr*) &client, addrlen);
+    bytes = sendto(pfd->fd, &client_err, 1, 0, (struct sockaddr*) &client, addrlen);
     if(bytes == -1)
     {
       errno_output("unable to send back status to unix socket");
@@ -972,7 +994,7 @@ e32_poll_socket_unix(struct E32 *dev, struct options *opts, struct pollfd pfd[],
   if(e32_transmit(dev, buf, bytes))
   {
     err_output("error in transmit\n");
-    clret++;
+    client_err++;
   }
 
   if(opts->output_standard)
@@ -982,11 +1004,141 @@ e32_poll_socket_unix(struct E32 *dev, struct options *opts, struct pollfd pfd[],
     fflush(stdout);
   }
 
-  bytes = sendto(pfd[3].fd, &clret, 1, 0, (struct sockaddr*) &client, addrlen);
+  bytes = sendto(pfd->fd, &client_err, 1, 0, (struct sockaddr*) &client, addrlen);
   if(bytes == -1)
     errno_output("unable to send back status to unix socket");
 
-  return clret;
+  debug_output("todo client %d at %s\n", list_size(dev->socket_list), client.sun_path);
+
+  return client_err;
+}
+
+static int
+e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, struct pollfd *pfd)
+{
+  ssize_t bytes, ret_bytes;
+  int ready;
+  uint8_t client_err; // return to socket clients
+  struct sockaddr_un client;
+  socklen_t addrlen; // unix domain socket client address
+  uint8_t *control;
+
+  ready = pfd->revents & POLLIN;
+
+  if(!ready)
+  {
+    return 0;
+  }
+
+  client_err = 0;
+  /*
+     allocate memory on the heap since we have to send it
+     to other functions for a buffer
+  */
+  control = malloc(32);
+  addrlen = sizeof(struct sockaddr_un);
+
+  bytes = recvfrom(pfd->fd, control, 32, 0, (struct sockaddr*) &client, &addrlen);
+  if(bytes == -1)
+  {
+    errno_output("error receiving from unix domain socket");
+    client_err = 1;
+  }
+
+  debug_output("received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
+
+  if(e32_set_mode(dev, SLEEP))
+  {
+    err_output("unable to go to sleep mode\n");
+    client_err = 2;
+  }
+
+  if(bytes == 1 && control[0] == 's')
+  {
+    if(e32_cmd_read_settings(dev))
+      client_err = 3;
+    memcpy(control, dev->settings, sizeof(dev->settings));
+    ret_bytes = sizeof(dev->settings);
+  }
+  else if(bytes == 1 && control[0] == 'v')
+  {
+    if(e32_cmd_read_version(dev))
+      client_err = 4;
+    memcpy(control, dev->version, sizeof(dev->version));
+    ret_bytes = sizeof(dev->version);
+  }
+  else if(bytes == 6 && (control[0] == 0xC0 || control[0] == 0xC3))
+  {
+    if(e32_cmd_write_settings(dev, control))
+      client_err = 5;
+    ret_bytes = bytes;
+  }
+  else
+  {
+    err_output("received %d bytes\n", bytes);
+    for(int i=0;i<bytes;i++)
+      err_output("%02x ", control[i]);
+    err_output("\n");
+    client_err = 7;
+  }
+
+  if(!client_err)
+  {
+    //dev->state = CONTROL;
+    if(opts->verbose)
+    {
+      for(int i=0;i<bytes;i++)
+        debug_output("%02x", control[i]);
+      debug_output("\n");
+    }
+
+    // TODO should we write standard output and verbose?
+    if(opts->output_standard)
+    {
+      buf[bytes] = '\0';
+      info_output("%s", buf);
+      fflush(stdout);
+    }
+  }
+
+  if(e32_set_mode(dev, NORMAL))
+  {
+    err_output("unable to go to normal mode\n");
+    client_err = 8;
+  }
+
+  if(client_err)
+  {
+    err_output("client error %d\n", client_err);
+    ret_bytes = 1;
+    control[0] = client_err;
+  }
+
+  bytes = sendto(pfd->fd, control, ret_bytes, 0, (struct sockaddr*) &client, addrlen);
+  if(bytes == -1)
+    errno_output("unable to send back status to unix socket");
+  else if(opts->verbose && opts->output_standard)
+  {
+    debug_output("writing back %d bytes to unix domain socket: %s\n", ret_bytes, client.sun_path);
+    for(int i=0;i<ret_bytes;i++)
+      debug_output("%02x", control[i]);
+    debug_output("\n");
+  }
+
+  /*
+    functions to read the settings and version will set the tty
+    to have a timeout. After this function returns we need to
+    set it back to a polling read. If the tcflush call isn't there
+    the poll loop will detect the uart can be read and when we
+    read it then it will have an invalid address. Once this happens
+    we get into an infinite loop of the UART being ready but
+    have an error when reading it.
+  */
+  tty_set_read_polling(dev->uart_fd, &dev->tty);
+  tcflush(dev->uart_fd, TCIFLUSH);
+
+  free(control);
+  return client_err;
 }
 
 static int
@@ -997,7 +1149,7 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
   int ready;
   int aux;
 
-  ready = pfd[4].revents & POLLPRI;
+  ready = pfd[PFD_GPIO_AUX].revents & POLLPRI;
 
   if(!ready)
   {
@@ -1027,9 +1179,9 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
       */
     usleep(54000);
 
-    bytes = read(pfd[1].fd, buf+(*total_bytes), 58);
+    bytes = read(pfd[PFD_UART].fd, buf+(*total_bytes), 58);
     if(bytes == -1)
-      errno_output("error reading from uart\n");
+      errno_output("e32_poll_gpio_aux() error reading from uart\n");
     else
       *total_bytes += bytes;
 
@@ -1054,15 +1206,16 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
     dev->state = IDLE;
     e32_poll_input_enable(opts, pfd);
   }
-  return 0;
 
+  return 0;
 }
 
 /*
 Input Sources
  - stdin
  - pipe
- - unix domain socket
+ - unix domain socket data
+ - unix domain socket control
  - file
 
  Read up to E32_TX_BUF_BYTES=512 bytes into buffer from the input source then disable it from polling.
@@ -1074,7 +1227,8 @@ Input Sources
 Output Sources
  - stdout
  - file
- - unix domain socket
+ - unix domain socket data
+ - unix domain socket control
 
 State Machine
  - IDLE -> When AUX=0
@@ -1088,7 +1242,7 @@ State Machine
 
  TODO it has not been tested reading and writing at the same time. I don't think the e32 can even
  do this. However, if we're already in TX then AUX cannot really transition to trigger going into
- RX mode anyhow. However, if we're in RX and an input source is ready we'd go into TX mode and
+ RX mode anyhow. Howe ver, if we're in RX and an input source is ready we'd go into TX mode and
  this may break.
 
 */
@@ -1096,9 +1250,11 @@ int
 e32_poll(struct E32 *dev, struct options *opts)
 {
   ssize_t total_bytes;
-  struct pollfd pfd[5];
   int ret, loop;
   size_t errors;
+
+  /* used in our poll loop */
+  struct pollfd pfd[6];
 
   e32_poll_init(dev, opts, pfd);
 
@@ -1106,7 +1262,7 @@ e32_poll(struct E32 *dev, struct options *opts)
   loop = 1;
   while(loop)
   {
-    ret = poll(pfd, 5, -1);
+    ret = poll(pfd, sizeof(pfd), -1);
     if(ret == 0)
     {
       err_output("poll timed out\n");
@@ -1118,22 +1274,27 @@ e32_poll(struct E32 *dev, struct options *opts)
       return ret;
     }
 
-    if(e32_poll_stdin(dev, opts, pfd, &loop))
+    if(e32_poll_stdin(dev, opts, &pfd[PFD_STDIN], &loop))
     {
       errors++;
     }
 
-    if(e32_poll_uart(dev, opts, pfd, &total_bytes, &loop))
+    if(e32_poll_uart(dev, opts, &pfd[PFD_UART], &total_bytes, &loop))
     {
       errors++;
     }
 
-    if(e32_poll_file(dev, opts, pfd, &loop))
+    if(e32_poll_file(dev, opts, &pfd[PFD_INPUT_FILE], &loop))
     {
       errors++;
     }
 
-    if(e32_poll_socket_unix(dev, opts, pfd, &loop))
+    if(e32_poll_socket_unix_data(dev, opts, &pfd[PFD_SOCKET_UNIX_DATA], &loop))
+    {
+      errors++;
+    }
+
+    if(e32_poll_socket_unix_control(dev, opts, &pfd[PFD_SOCKET_UNIX_CONTROL]))
     {
       errors++;
     }

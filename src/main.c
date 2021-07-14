@@ -105,7 +105,7 @@ main(int argc, char *argv[])
 
   if(opts.settings_write_input[0])
   {
-    err |= e32_cmd_write_settings(&dev, &opts);
+    err |= e32_cmd_write_settings(&dev, opts.settings_write_input);
   }
 
   /* switch back to normal mode for tx/rx */

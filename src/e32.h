@@ -103,7 +103,7 @@ int
 e32_cmd_reset(struct E32 *dev);
 
 int
-e32_cmd_write_settings(struct E32 *dev, struct options *opts);
+e32_cmd_write_settings(struct E32 *dev, uint8_t *settings);
 
 ssize_t
 e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len);
