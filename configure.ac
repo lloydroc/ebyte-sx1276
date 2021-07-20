@@ -48,6 +48,7 @@ AM_CONDITIONAL([HAVE_SYSTEMD], [test "x$with_systemdsystemunitdir" != "xno"])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
+                 scripts/Makefile
                  systemd/Makefile
                  test/Makefile])
 AC_OUTPUT

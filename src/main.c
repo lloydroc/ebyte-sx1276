@@ -53,7 +53,10 @@ main(int argc, char *argv[])
 
   err = e32_init(&dev, &opts);
   if(err)
+  {
+    err_output("unable to initialize the e32");
     goto cleanup;
+  }
 
   if(opts.mode != -1)
   {

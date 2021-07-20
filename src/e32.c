@@ -885,7 +885,7 @@ e32_poll_uart(struct E32 *dev, struct options *opts, struct pollfd *pfd, ssize_t
     *total_bytes += bytes;
 
   if(dev->verbose)
-    debug_output("received %d, %d bytes from uart\n", *total_bytes, bytes);
+    debug_output("e32_poll_uart(): received %d bytes for a total of %d bytes from uart\n", bytes , *total_bytes);
 
   return 0;
 }
@@ -999,16 +999,18 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *
 
   if(opts->output_standard)
   {
+    info_output("transmitted:\n");
     buf[bytes] = '\0';
     info_output("%s", buf);
     fflush(stdout);
+    info_output("\n");
   }
 
   bytes = sendto(pfd->fd, &client_err, 1, 0, (struct sockaddr*) &client, addrlen);
   if(bytes == -1)
-    errno_output("unable to send back status to unix socket");
-
-  debug_output("todo client %d at %s\n", list_size(dev->socket_list), client.sun_path);
+  {
+    errno_output("unable to send back status to unix socket %s\n", client.sun_path);
+  }
 
   return client_err;
 }
@@ -1179,14 +1181,17 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
       */
     usleep(54000);
 
-    bytes = read(pfd[PFD_UART].fd, buf+(*total_bytes), 58);
+    bytes = read(pfd[PFD_UART].fd, buf+(*total_bytes), E32_TX_BUF_BYTES);
     if(bytes == -1)
+    {
       errno_output("e32_poll_gpio_aux() error reading from uart\n");
+      return -1;
+    }
     else
       *total_bytes += bytes;
 
     if(dev->verbose)
-      debug_output("received %d, %d bytes from uart\n", *total_bytes, bytes);
+      debug_output("e32_poll_gpio_aux(): received %d bytes for a total of %d bytes from uart\n", bytes ,*total_bytes);
 
     if(e32_write_output(dev, opts, buf, *total_bytes))
       err_output("error writing outputs after RX to IDLE transition\n");
@@ -1242,7 +1247,7 @@ State Machine
 
  TODO it has not been tested reading and writing at the same time. I don't think the e32 can even
  do this. However, if we're already in TX then AUX cannot really transition to trigger going into
- RX mode anyhow. Howe ver, if we're in RX and an input source is ready we'd go into TX mode and
+ RX mode anyhow. However, if we're in RX and an input source is ready we'd go into TX mode and
  this may break.
 
 */
@@ -1260,6 +1265,7 @@ e32_poll(struct E32 *dev, struct options *opts)
 
   errors = 0;
   loop = 1;
+  total_bytes = 0;
   while(loop)
   {
     ret = poll(pfd, sizeof(pfd), -1);
