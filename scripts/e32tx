@@ -1,0 +1,60 @@
+#!/usr/bin/python3
+
+"""
+Write data to the socket of the e32 for transmission
+"""
+
+import socket
+import sys
+import os
+import argparse
+from pathlib import Path
+
+parser = argparse.ArgumentParser(description="Transmit Data through the e32 socket")
+parser.add_argument('message',
+    help="The message to send")
+parser.add_argument('--datasock',
+    help="data socket to send data to the e32",
+    default="/run/e32.data")
+parser.add_argument('--clientsock',
+    help="client socket for e32 to send data this program",
+    default=str(Path.home())+"/client.sock")
+
+args = parser.parse_args()
+
+e32_sock = args.datasock
+csock_file = args.clientsock
+
+if os.path.exists(csock_file):
+    os.remove(csock_file)
+
+csock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+csock.bind(csock_file)
+
+print("registering socket", csock_file, "to", e32_sock)
+csock.sendto(b'', e32_sock)
+(msg, address) = csock.recvfrom(10)
+
+if len(msg) != 1 or msg[0] != 0:
+    print("unable to register client")
+    sys.exit(1)
+else:
+    print("client registered")
+
+msg = str.encode(args.message)
+print("sending", len(msg), msg)
+
+csock.sendto(msg, e32_sock)
+(msg, address) = csock.recvfrom(10)
+
+if len(msg) == 1 and msg[0] == 0:
+    print("success")
+else:
+    print("failed to send data. len:", len(msg))
+
+# note we don't close the socket or delete the socket file here
+# although the socket will get bytes from recvfrom the sender with
+# the sendto will get a [ENOENT No such file or directory] even
+# though the data has been sent. I've fixed this with by sleeping
+# however a real program would likely keep the socket open and
+# this wouldn't be an issue

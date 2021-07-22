@@ -51,7 +51,7 @@ info_output(const char *format, ...)
 {
   va_list argList;
   va_start(argList, format);
-  output(LOG_DEBUG, format, argList);
+  output(LOG_INFO, format, argList);
   va_end(argList);
 }
 

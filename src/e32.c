@@ -672,6 +672,9 @@ e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len)
     return bytes;
   }
 
+  if(dev->verbose)
+      debug_output("transmitted %d bytes\n", bytes);
+
   return 0;
 }
 
@@ -863,7 +866,7 @@ e32_poll_stdin(struct E32 *dev, struct options *opts, struct pollfd *pfd, int *l
 }
 
 static int
-e32_poll_uart(struct E32 *dev, struct options *opts, struct pollfd *pfd, ssize_t *total_bytes, int *loop_continue)
+e32_poll_uart(struct E32 *dev, struct options *opts, struct pollfd *pfd, ssize_t *total_bytes)
 {
   ssize_t bytes;
   int ready;
@@ -876,16 +879,17 @@ e32_poll_uart(struct E32 *dev, struct options *opts, struct pollfd *pfd, ssize_t
   }
 
   bytes = read(pfd->fd, buf+(*total_bytes), E32_TX_BUF_BYTES);
+  //bytes = read(pfd->fd, buf, E32_TX_BUF_BYTES);
   if(bytes == -1)
   {
-    errno_output("e32_poll_uart() error reading from uart, mode is %d\n", dev->mode);
+    errno_output("e32_poll_uart() error reading from uart, fd=%d, buf=%p, total=%p, mode=%d\n", pfd->fd, buf, total_bytes, dev->mode);
     return 1;
   }
-  else
-    *total_bytes += bytes;
+
+  *total_bytes += bytes;
 
   if(dev->verbose)
-    debug_output("e32_poll_uart(): received %d bytes for a total of %d bytes from uart\n", bytes , *total_bytes);
+    debug_output("e32_poll_uart(): received %d bytes for a total of %ld bytes from uart\n", bytes, *total_bytes);
 
   return 0;
 }
@@ -989,6 +993,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *
       errno_output("unable to send back status to unix socket");
       return 1;
     }
+    return 0;
   }
 
   if(e32_transmit(dev, buf, bytes))
@@ -1144,7 +1149,7 @@ e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, struct pollf
 }
 
 static int
-e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ssize_t *total_bytes, int *loop_continue)
+e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ssize_t *total_bytes)
 {
   /* AUX pin transitioned from high->low or low->high */
   ssize_t bytes;
@@ -1187,11 +1192,11 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
       errno_output("e32_poll_gpio_aux() error reading from uart\n");
       return -1;
     }
-    else
-      *total_bytes += bytes;
+    
+    *total_bytes += bytes;
 
     if(dev->verbose)
-      debug_output("e32_poll_gpio_aux(): received %d bytes for a total of %d bytes from uart\n", bytes ,*total_bytes);
+      debug_output("e32_poll_gpio_aux(): received %d bytes for a total of %d bytes from uart\n", bytes, *total_bytes);
 
     if(e32_write_output(dev, opts, buf, *total_bytes))
       err_output("error writing outputs after RX to IDLE transition\n");
@@ -1254,7 +1259,7 @@ State Machine
 int
 e32_poll(struct E32 *dev, struct options *opts)
 {
-  ssize_t total_bytes;
+  ssize_t *total_bytes;
   int ret, loop;
   size_t errors;
 
@@ -1265,7 +1270,8 @@ e32_poll(struct E32 *dev, struct options *opts)
 
   errors = 0;
   loop = 1;
-  total_bytes = 0;
+  total_bytes = malloc(sizeof(ssize_t));
+
   while(loop)
   {
     ret = poll(pfd, sizeof(pfd), -1);
@@ -1285,7 +1291,7 @@ e32_poll(struct E32 *dev, struct options *opts)
       errors++;
     }
 
-    if(e32_poll_uart(dev, opts, &pfd[PFD_UART], &total_bytes, &loop))
+    if(e32_poll_uart(dev, opts, &pfd[PFD_UART], total_bytes))
     {
       errors++;
     }
@@ -1313,11 +1319,12 @@ e32_poll(struct E32 *dev, struct options *opts)
       e32_poll_input_disable(opts, pfd);
     }
 
-    if(e32_poll_gpio_aux(dev, opts, pfd, &total_bytes, &loop))
+    if(e32_poll_gpio_aux(dev, opts, pfd, total_bytes))
     {
       errors++;
     }
   }
 
+  free(total_bytes);
   return errors;
 }
