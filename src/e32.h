@@ -1,6 +1,7 @@
 #ifndef E32_DEF
 #define E32_DEF
 
+#include <assert.h>
 #include <poll.h>
 #include <sys/time.h>
 #include <termios.h>
@@ -103,7 +104,7 @@ int
 e32_cmd_reset(struct E32 *dev);
 
 int
-e32_cmd_write_settings(struct E32 *dev, struct options *opts);
+e32_cmd_write_settings(struct E32 *dev, uint8_t *settings);
 
 ssize_t
 e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len);
@@ -111,7 +112,7 @@ e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len);
 int
 e32_receive(struct E32 *dev, uint8_t *buf, size_t buf_len);
 
-int
+size_t
 e32_poll(struct E32 *dev, struct options *opts);
 
 #endif

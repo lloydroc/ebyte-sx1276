@@ -13,7 +13,7 @@ tty_set_read_polling(int fd, struct termios *tty)
    */
   if(tcsetattr(fd, TCSANOW, tty) == -1)
   {
-    err_output("error setting terminal attributes");
+    err_output("tty_set_read_polling(): error setting terminal attributes");
     return -1;
   }
 
@@ -32,7 +32,7 @@ tty_set_read_with_timeout(int fd, struct termios *tty, int deciseconds)
    */
   if(tcsetattr(fd, TCSANOW, tty) == -1)
   {
-    err_output("error setting terminal attributes");
+    err_output("tty_set_read_with_timeout(): error setting terminal attributes");
     return -1;
   }
 

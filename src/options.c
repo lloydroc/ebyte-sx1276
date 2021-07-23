@@ -12,24 +12,25 @@ usage(char *progname)
   printf("Version %s\n\n", VERSION);
   printf("A command line tool to transmit and receive data from the EByte e32 LORA Module. If this tool is run without options the e32 will transmit what is sent from the keyboard - stdin and will output what is received to stdout. Hit return to send the message. To test a connection between two e32 boards run a %s -s on both to ensure status information is correct and matching. Once the status is deemed compatible on both e32 modules then run %s without options on both. On the first type something and hit enter, which will transmit from one e32 to the other and you should see this message show up on second e32.\n\n", progname, progname);
   printf("OPTIONS:\n\
--h --help                  Print help\n\
--r --reset                 SW Reset\n\
--t --test                  Perform a test\n\
--v --verbose               Verbose Output\n\
--s --status                Get status model, frequency, address, channel, data rate, baud, parity and transmit power.\n\
--w --write-settings HEX    Write settings from HEX. see datasheet for these 6 bytes. Example: -w C000001A1744.\n\
-                           For the form XXYYYY1AZZ44. If XX=C0 parameters are saved to e32's EEPROM, if XX=C2 settings\n\
-                           will be lost on power cycle. The address is represented by YYYY and the channel is represented\n\
-                           by ZZ.\n\
--y --tty                   The UART to use. Defaults to /dev/serial0 the soft link\n\
--m --mode MODE             Set mode to normal, wake-up, power-save or sleep.\n\
-   --m0                    GPIO M0 Pin for output [%d]\n\
-   --m1                    GPIO M1 Pin for output [%d]\n\
-   --aux                   GPIO Aux Pin for input interrupt [%d]\n\
-   --in-file  FILENAME     Transmit a file\n\
-   --out-file FILENAME     Write received output to a file\n\
--x --socket-unix FILENAME  Send and receive data from a Unix Domain Socket\n\
--d --daemon                Run as a Daemon\n\
+-h --help                Print help\n\
+-r --reset               SW Reset\n\
+-t --test                Perform a test\n\
+-v --verbose             Verbose Output\n\
+-s --status              Get status model, frequency, address, channel, data rate, baud, parity and transmit power.\n\
+-w --write-settings HEX  Write settings from HEX. see datasheet for these 6 bytes. Example: -w C000001A1744.\n\
+                         For the form XXYYYY1AZZ44. If XX=C0 parameters are saved to e32's EEPROM, if XX=C2 settings\n\
+                         will be lost on power cycle. The address is represented by YYYY and the channel is represented\n\
+                         by ZZ.\n\
+-y --tty                 The UART to use. Defaults to /dev/serial0 the soft link\n\
+-m --mode MODE           Set mode to normal, wake-up, power-save or sleep.\n\
+   --m0                  GPIO M0 Pin for output [%d]\n\
+   --m1                  GPIO M1 Pin for output [%d]\n\
+   --aux                 GPIO Aux Pin for input interrupt [%d]\n\
+   --in-file  FILENAME   Transmit a file\n\
+   --out-file FILENAME   Write received output to a file\n\
+-x --sock-unix-data FILE Send and receive data from a Unix Domain Socket\n\
+-c --sock-unix-ctrl FILE Change and Read settings from a Unix Domain Socket\n\
+-d --daemon              Run as a Daemon\n\
 ", opts.gpio_m0, opts.gpio_m1, opts.gpio_aux);
 }
 
@@ -66,7 +67,8 @@ options_init(struct options *opts)
   opts->output_standard = 1;
   opts->input_file = NULL;
   opts->output_file = NULL;
-  opts->fd_socket_unix = -1;
+  opts->fd_socket_unix_data = -1;
+  opts->fd_socket_unix_control = -1;
   memset(opts->settings_write_input, 0, sizeof(opts->settings_write_input));
   snprintf(opts->tty_name, 64, "/dev/serial0");
 }
@@ -84,6 +86,9 @@ options_print(struct options* opts)
   printf("option GPIO AUX Pin is %d\n", opts->gpio_aux);
   printf("option daemon %d\n", opts->daemon);
   printf("option TTY Name is %s\n", opts->tty_name);
+  printf("option socket unix data file desciptor %d\n", opts->fd_socket_unix_data);
+  printf("option socket unix control file desciptor %d\n", opts->fd_socket_unix_control);
+
   if(opts->settings_write_input[0])
   {
     printf("option write settings is: ");
@@ -104,8 +109,11 @@ options_deinit(struct options *opts)
   if(opts->output_file)
     err |= fclose(opts->output_file);
 
-  if(opts->fd_socket_unix != -1)
-    close(opts->fd_socket_unix);
+  if(opts->fd_socket_unix_data != -1)
+    close(opts->fd_socket_unix_data);
+
+  if(opts->fd_socket_unix_control != -1)
+    close(opts->fd_socket_unix_control);
 
   return err;
 }
@@ -137,18 +145,18 @@ options_open_file(char *optarg, char *mode)
 }
 
 static int
-options_open_socket_unix(struct options *opts, char *optarg)
+options_open_socket_unix(char *filename, int *fd, struct sockaddr_un *sock)
 {
-  opts->fd_socket_unix = socket(AF_UNIX, SOCK_DGRAM, 0);
-  if(opts->fd_socket_unix == -1)
+  *fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+  if(*fd == -1)
   {
     errno_output("error opening socket\n");
     return 1;
   }
 
-  if(strlen(optarg) > sizeof(opts->socket_unix_server.sun_path)-1)
+  if(strlen(optarg) > sizeof(sock->sun_path)-1)
   {
-    err_output("socket path too long must be %d chars\n", sizeof(opts->socket_unix_server.sun_path)-1);
+    err_output("socket path too long must be %d chars\n", sizeof(sock->sun_path)-1);
     return 2;
   }
 
@@ -158,11 +166,11 @@ options_open_socket_unix(struct options *opts, char *optarg)
     return 2;
   }
 
-  memset(&opts->socket_unix_server, 0, sizeof(struct sockaddr_un));
-  opts->socket_unix_server.sun_family = AF_UNIX;
-  strncpy(opts->socket_unix_server.sun_path, optarg, sizeof(opts->socket_unix_server.sun_path)-1);
+  memset(sock, 0, sizeof(struct sockaddr_un));
+  sock->sun_family = AF_UNIX;
+  strncpy(sock->sun_path, optarg, sizeof(sock->sun_path)-1);
 
-  if(bind(opts->fd_socket_unix, (struct sockaddr*) &opts->socket_unix_server, sizeof(struct sockaddr_un)) == -1)
+  if(bind(*fd, (struct sockaddr*) sock, sizeof(struct sockaddr_un)) == -1)
   {
     errno_output("error binding to socket\n");
     return 3;
@@ -223,11 +231,9 @@ options_parse(struct options *opts, int argc, char *argv[])
 #define BUF 128
   char infile[BUF];
   char outfile[BUF];
-  char sockunix[BUF];
 
   infile[0] = '\0';
   outfile[0] = '\0';
-  sockunix[0] = '\0';
 
   static struct option long_options[] =
   {
@@ -244,7 +250,8 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"aux",                required_argument, 0,   0},
     {"in-file",            required_argument, 0,   0},
     {"out-file",           required_argument, 0,   0},
-    {"socket-unix",        required_argument, 0, 'x'},
+    {"sock-unix-data",     required_argument, 0, 'x'},
+    {"sock-unix-ctrl",     required_argument, 0, 'c'},
     {"binary",                   no_argument, 0, 'b'},
     {"daemon",                   no_argument, 0, 'd'},
     {0,                                    0, 0,   0}
@@ -253,7 +260,7 @@ options_parse(struct options *opts, int argc, char *argv[])
   while(1)
   {
     option_index = 0;
-    c = getopt_long(argc, argv, "hrtvsy:m:bdx:w:", long_options, &option_index);
+    c = getopt_long(argc, argv, "hrtvsy:m:bdx:w:c:", long_options, &option_index);
 
     if(c == -1)
       break;
@@ -275,6 +282,10 @@ options_parse(struct options *opts, int argc, char *argv[])
         strncpy(opts->tty_name, optarg, 64);
       else if(strcmp("write-input", long_options[option_index].name) == 0)
         err |= options_parse_settings(opts, optarg);
+      else if(strcmp("sock-unix-data", long_options[option_index].name) == 0)
+        err |= options_open_socket_unix(optarg, &opts->fd_socket_unix_data, &opts->socket_unix_data);
+      else if(strcmp("sock-unix-ctrl", long_options[option_index].name) == 0)
+        err |= options_open_socket_unix(optarg, &opts->fd_socket_unix_control, &opts->socket_unix_control);
       break;
     case 'h':
       opts->help = 1;
@@ -302,7 +313,10 @@ options_parse(struct options *opts, int argc, char *argv[])
       }
       break;
     case 'x':
-      strncpy(sockunix, optarg, BUF);
+      err |= options_open_socket_unix(optarg, &opts->fd_socket_unix_data, &opts->socket_unix_data);
+      break;
+    case 'c':
+      err |= options_open_socket_unix(optarg, &opts->fd_socket_unix_control, &opts->socket_unix_control);
       break;
     case 'd':
       opts->daemon = 1;
@@ -322,9 +336,6 @@ options_parse(struct options *opts, int argc, char *argv[])
     opts->output_standard = 0;
     openlog("e32", 0, LOG_DAEMON);
   }
-
-  if(strnlen(sockunix, BUF))
-    err |= options_open_socket_unix(opts, sockunix);
 
   if(strnlen(infile, BUF))
   {

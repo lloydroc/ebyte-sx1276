@@ -3,8 +3,11 @@ Description=ebyte e32 systemd service
 
 [Service]
 Type=forking
+ExecStartPre=stat /dev/serial0
 ExecStartPre=/usr/local/bin/e32 --reset
-ExecStart=/usr/local/bin/e32 -v --daemon --socket-unix /run/e32.socket
+ExecStart=/usr/local/bin/e32 --daemon --sock-unix-data /run/e32.data --sock-unix-ctrl /run/e32.control
+ExecStartPost=chown --reference=/dev/serial0 /run/e32.data /run/e32.control
+ExecStartPost=chmod --reference=/dev/serial0 /run/e32.data /run/e32.control
 StandardOutput=journal
 StandardError=journal
 

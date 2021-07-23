@@ -1,0 +1,68 @@
+#!/usr/bin/python3
+
+"""
+Read received data from the e32 socket
+"""
+
+import socket
+import sys
+import os
+import signal
+import argparse
+from pathlib import Path
+
+parser = argparse.ArgumentParser(description="Receive data from the e32 socket")
+parser.add_argument('--datasock',
+    help="data socket to send data to the e32",
+    default="/run/e32.data")
+parser.add_argument('--clientsock',
+    help="client socket for e32 to send data this program",
+    default=str(Path.home())+"/client.sock")
+
+args = parser.parse_args()
+
+# register a signal handler so when clean up the socket on ^C for instance
+def handler(signum):
+    """ Handle signals by closing the socket """
+    if signum == signal.SIGINT:
+        close_sock()
+    sys.exit(1)
+
+signal.signal(signal.SIGALRM, handler)
+signal.signal(signal.SIGINT, handler)
+
+def close_sock():
+    """ close the socket and delete the file """
+    global client_sock
+    global csock
+
+    print("closing client socket", client_sock)
+
+    csock.close()
+
+    if os.path.exists(client_sock):
+        os.remove(client_sock)
+
+client_sock = args.clientsock
+e32_sock = args.datasock
+
+if os.path.exists(client_sock):
+    os.remove(client_sock)
+
+csock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+csock.bind(client_sock)
+
+print("registering socket", e32_sock)
+csock.sendto(b'', e32_sock)
+(msg, address) = csock.recvfrom(10)
+
+if msg[0] != 0:
+    print("unable to register client")
+    sys.exit(1)
+else:
+    print("client registered")
+
+while True:
+    # receive from the e32
+    (msg, address) = csock.recvfrom(59)
+    print("received from", address, len(msg),"bytes with", msg)
