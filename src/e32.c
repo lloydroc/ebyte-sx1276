@@ -1262,10 +1262,10 @@ State Machine
  this may break.
 
 */
-int
+size_t
 e32_poll(struct E32 *dev, struct options *opts)
 {
-  ssize_t *total_bytes;
+  ssize_t total_bytes;
   int ret, loop;
   size_t errors;
 
@@ -1276,11 +1276,11 @@ e32_poll(struct E32 *dev, struct options *opts)
 
   errors = 0;
   loop = 1;
-  total_bytes = malloc(sizeof(ssize_t));
+  total_bytes = 0;
 
   while(loop)
   {
-    ret = poll(pfd, sizeof(pfd), -1);
+    ret = poll(pfd, 6, -1);
     if(ret == 0)
     {
       err_output("poll timed out\n");
@@ -1297,7 +1297,7 @@ e32_poll(struct E32 *dev, struct options *opts)
       errors++;
     }
 
-    if(e32_poll_uart(dev, opts, &pfd[PFD_UART], total_bytes))
+    if(e32_poll_uart(dev, opts, &pfd[PFD_UART], &total_bytes))
     {
       errors++;
     }
@@ -1325,12 +1325,11 @@ e32_poll(struct E32 *dev, struct options *opts)
       e32_poll_input_disable(opts, pfd);
     }
 
-    if(e32_poll_gpio_aux(dev, opts, pfd, total_bytes))
+    if(e32_poll_gpio_aux(dev, opts, pfd, &total_bytes))
     {
       errors++;
     }
   }
 
-  free(total_bytes);
   return errors;
 }
