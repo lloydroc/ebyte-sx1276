@@ -1,6 +1,10 @@
 #include "e32.h"
 
-uint8_t buf[E32_TX_BUF_BYTES+1];
+/*
+ reserve 1 extra byte for the newline
+ and one byte to detect overflow
+*/
+uint8_t buf[E32_TX_BUF_BYTES+2];
 
  /* define these indices so we don't have to reference pfd[3] */
 #define PFD_STDIN 0
@@ -693,6 +697,9 @@ e32_write_output(struct E32 *dev, struct options *opts, uint8_t* buf, const size
   size_t outbytes;
   int ret = 0;
 
+  if(bytes == 0)
+    return 0;
+
   if(opts->output_file != NULL)
   {
     outbytes = fwrite(buf, 1, bytes, opts->output_file);
@@ -954,7 +961,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *
   client_err = 0;
   addrlen = sizeof(struct sockaddr_un);
 
-  bytes = recvfrom(pfd->fd, buf, E32_TX_BUF_BYTES, 0, (struct sockaddr*) &client, &addrlen);
+  bytes = recvfrom(pfd->fd, buf, E32_TX_BUF_BYTES+1, 0, (struct sockaddr*) &client, &addrlen);
   if(bytes == -1)
   {
     errno_output("error receiving from unix domain socket");
@@ -962,8 +969,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *
   }
   else if(bytes > E32_TX_BUF_BYTES)
   {
-    err_output("overflow: datagram truncated to %d bytes", E32_TX_BUF_BYTES);
-    bytes = E32_TX_BUF_BYTES;
+    err_output("overflow: received %d bytes", E32_TX_BUF_BYTES);
     client_err++;
   }
 
@@ -996,7 +1002,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *
     return 0;
   }
 
-  if(e32_transmit(dev, buf, bytes))
+  if(!client_err && e32_transmit(dev, buf, bytes))
   {
     err_output("error in transmit\n");
     client_err++;

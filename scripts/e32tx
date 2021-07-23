@@ -48,9 +48,10 @@ csock.sendto(msg, e32_sock)
 (msg, address) = csock.recvfrom(10)
 
 if len(msg) == 1 and msg[0] == 0:
-    print("success")
+    print("success! received 1 byte from socket", address)
 else:
     print("failed to send data. len:", len(msg))
+    sys.exit(1)
 
 # note we don't close the socket or delete the socket file here
 # although the socket will get bytes from recvfrom the sender with

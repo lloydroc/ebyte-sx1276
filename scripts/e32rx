@@ -65,4 +65,4 @@ else:
 while True:
     # receive from the e32
     (msg, address) = csock.recvfrom(59)
-    print("received", len(msg), msg)
+    print("received from", address, len(msg),"bytes with", msg)
