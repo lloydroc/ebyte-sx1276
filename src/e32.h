@@ -1,6 +1,7 @@
 #ifndef E32_DEF
 #define E32_DEF
 
+#include <assert.h>
 #include <poll.h>
 #include <sys/time.h>
 #include <termios.h>

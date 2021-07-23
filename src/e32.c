@@ -1296,26 +1296,31 @@ e32_poll(struct E32 *dev, struct options *opts)
     {
       errors++;
     }
+    assert(errors == 0);
 
     if(e32_poll_uart(dev, opts, &pfd[PFD_UART], &total_bytes))
     {
       errors++;
     }
+    assert(errors == 0);
 
     if(e32_poll_file(dev, opts, &pfd[PFD_INPUT_FILE], &loop))
     {
       errors++;
     }
+    assert(errors == 0);
 
     if(e32_poll_socket_unix_data(dev, opts, &pfd[PFD_SOCKET_UNIX_DATA], &loop))
     {
       errors++;
     }
+    assert(errors == 0);
 
     if(e32_poll_socket_unix_control(dev, opts, &pfd[PFD_SOCKET_UNIX_CONTROL]))
     {
       errors++;
     }
+    assert(errors == 0);
 
     /* If we're already transmitting we will wait to
        go to the IDLE state before polling more inputs
@@ -1329,6 +1334,9 @@ e32_poll(struct E32 *dev, struct options *opts)
     {
       errors++;
     }
+
+    assert(errors == 0);
+    assert(total_bytes <= E32_TX_BUF_BYTES);
   }
 
   return errors;
