@@ -45,7 +45,7 @@ msg = str.encode(args.message)
 print("sending", len(msg), msg)
 
 csock.sendto(msg, e32_sock)
-(msg, address) = csock.recvfrom(10)
+(msg, address) = csock.recvfrom(512)
 
 if len(msg) == 1 and msg[0] == 0:
     print("success! received 1 byte from socket", address)
