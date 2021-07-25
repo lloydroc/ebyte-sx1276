@@ -23,7 +23,10 @@
  out quite difficult. For now we'll have to use 58 until a better solution
  can be devised.
 */
-#define E32_TX_BUF_BYTES 58
+#define E32_MAX_PACKET_LENGTH 58
+
+#define TX_BUF_BYTES 512
+#define RX_BUF_BYTES 512
 
 enum E32_mode
 {

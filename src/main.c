@@ -21,7 +21,7 @@ void signal_handler(int sig)
   int exit_status;
 
   if(opts.daemon)
-    info_output("daemon stopping pid=%d", getpid());
+    info_output("daemon stopping pid=%d sig=%d", getpid(), sig);
 
   options_deinit(&opts);
   exit_status = e32_deinit(&dev, &opts);

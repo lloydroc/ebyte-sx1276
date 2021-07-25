@@ -1,10 +1,7 @@
 #include "e32.h"
 
-/*
- reserve 1 extra byte for the newline
- and one byte to detect overflow
-*/
-uint8_t buf[E32_TX_BUF_BYTES+2];
+uint8_t txbuf[TX_BUF_BYTES];
+uint8_t rxbuf[RX_BUF_BYTES];
 
  /* define these indices so we don't have to reference pfd[3] */
 #define PFD_STDIN 0
@@ -262,10 +259,10 @@ e32_deinit(struct E32 *dev, struct options* opts)
 static int
 e32_read_uart(struct E32* dev, uint8_t buf[], int n_bytes)
 {
-  int bytes, total_bytes;
+  int bytes, bytes_read;
   uint8_t *ptr;
 
-  bytes = total_bytes = 0;
+  bytes = bytes_read = 0;
   ptr = buf;
 
   do
@@ -282,17 +279,17 @@ e32_read_uart(struct E32* dev, uint8_t buf[], int n_bytes)
       return 2;
     }
 
-    total_bytes += bytes;
-    if(total_bytes > n_bytes)
+    bytes_read += bytes;
+    if(bytes_read > n_bytes)
     {
-      err_output("overrun expected %d bytes but read %d\n", n_bytes, total_bytes);
+      err_output("overrun expected %d bytes but read %d\n", n_bytes, bytes_read);
       return 3;
     }
 
     ptr += bytes;
 
   }
-  while (total_bytes < n_bytes);
+  while (bytes_read < n_bytes);
 
   return 0;
 
@@ -834,21 +831,11 @@ e32_poll_init(struct E32 *dev, struct options *opts, struct pollfd pfd[])
 }
 
 static int
-e32_poll_stdin(struct E32 *dev, struct options *opts, struct pollfd *pfd, int *loop_continue)
+e32_poll_stdin(struct E32 *dev, int fd_stdin, int *loop_continue)
 {
   ssize_t bytes;
-  int ready;
 
-  ready = pfd->revents & POLLIN;
-
-  if(!ready)
-  {
-    return 0;
-  }
-
-  dev->state = TX;
-
-  bytes = read(pfd->fd, &buf, E32_TX_BUF_BYTES);
+  bytes = read(fd_stdin, &txbuf, E32_MAX_PACKET_LENGTH);
   if(bytes == -1)
   {
     errno_output("error reading from stdin\n");
@@ -858,11 +845,11 @@ e32_poll_stdin(struct E32 *dev, struct options *opts, struct pollfd *pfd, int *l
   if(dev->verbose)
     debug_output("got %d bytes as input writing to uart\n", bytes);
 
-  if(e32_transmit(dev, buf, bytes))
+  if(e32_transmit(dev, txbuf, bytes))
     return 3;
 
   /* sent input through a pipe */
-  if(!dev->isatty && bytes < E32_TX_BUF_BYTES)
+  if(!dev->isatty && bytes < E32_MAX_PACKET_LENGTH)
   {
     if(dev->verbose)
       debug_output("getting out of loop\n");
@@ -873,66 +860,49 @@ e32_poll_stdin(struct E32 *dev, struct options *opts, struct pollfd *pfd, int *l
 }
 
 static int
-e32_poll_uart(struct E32 *dev, struct options *opts, struct pollfd *pfd, ssize_t *total_bytes)
+e32_poll_uart(struct E32 *dev, int fd_uart, ssize_t *rx_buf_size)
 {
   ssize_t bytes;
-  int ready;
 
-  ready = pfd->revents & POLLIN;
-
-  if(!ready)
-  {
-    return 0;
-  }
-
-  bytes = read(pfd->fd, buf+(*total_bytes), E32_TX_BUF_BYTES);
-  //bytes = read(pfd->fd, buf, E32_TX_BUF_BYTES);
+  bytes = read(fd_uart, rxbuf+(*rx_buf_size), RX_BUF_BYTES);
   if(bytes == -1)
   {
-    errno_output("e32_poll_uart() error reading from uart, fd=%d, buf=%p, total=%p, mode=%d\n", pfd->fd, buf, total_bytes, dev->mode);
+    errno_output("e32_poll_uart() error reading from uart, fd=%d, buf=%p, total=%p, mode=%d\n", fd_uart, rxbuf, rx_buf_size, dev->mode);
     return 1;
   }
 
-  *total_bytes += bytes;
+  *rx_buf_size += bytes;
 
   if(dev->verbose)
-    debug_output("e32_poll_uart(): received %d bytes for a total of %ld bytes from uart\n", bytes, *total_bytes);
+    debug_output("e32_poll_uart(): received %d bytes for a total of %ld bytes from uart\n", bytes, *rx_buf_size);
 
   return 0;
 }
 
 static int
-e32_poll_file(struct E32 *dev, struct options *opts, struct pollfd *pfd, int *loop_continue)
+e32_poll_file(struct E32 *dev, struct options *opts, int fd_file, int *loop_continue)
 {
   ssize_t bytes;
-  int ready;
-
-  ready = pfd->revents & POLLIN;
-
-  if(!ready)
-  {
-    return 0;
-  }
 
   if(opts->verbose)
-    debug_output("reading from fd %d\n", pfd->fd);
+    debug_output("reading from fd %d\n", fd_file);
 
-  bytes = fread(buf, 1, E32_TX_BUF_BYTES, opts->input_file);
+  bytes = fread(txbuf, 1, E32_MAX_PACKET_LENGTH, opts->input_file);
 
   if(opts->verbose)
     debug_output("writing %d bytes from file to uart\n", bytes);
 
-  if(e32_transmit(dev, buf, bytes))
+  if(e32_transmit(dev, txbuf, bytes))
   {
     err_output("error in transmit\n");
     return 1;
   }
 
-  if(e32_write_output(dev, opts, buf, bytes))
+  if(e32_write_output(dev, opts, txbuf, bytes))
     err_output("error writing outputs\n");
 
   /* all bytes read from file */
-  if(bytes < E32_TX_BUF_BYTES)
+  if(bytes < E32_MAX_PACKET_LENGTH)
   {
     if(opts->verbose)
       debug_output("getting out of loop\n");
@@ -943,33 +913,25 @@ e32_poll_file(struct E32 *dev, struct options *opts, struct pollfd *pfd, int *lo
 }
 
 static int
-e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *pfd, int *loop_continue)
+e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, int *loop_continue)
 {
   ssize_t bytes;
-  int ready;
   uint8_t client_err; // return to socket clients
   struct sockaddr_un client;
   socklen_t addrlen; // unix domain socket client address
 
-  ready = pfd->revents & POLLIN;
-
-  if(!ready)
-  {
-    return 0;
-  }
-
   client_err = 0;
   addrlen = sizeof(struct sockaddr_un);
 
-  bytes = recvfrom(pfd->fd, buf, E32_TX_BUF_BYTES+1, 0, (struct sockaddr*) &client, &addrlen);
+  bytes = recvfrom(fd_sockd, txbuf, E32_MAX_PACKET_LENGTH+1, 0, (struct sockaddr*) &client, &addrlen);
   if(bytes == -1)
   {
     errno_output("error receiving from unix domain socket");
     return 1;
   }
-  else if(bytes > E32_TX_BUF_BYTES)
+  else if(bytes > E32_MAX_PACKET_LENGTH)
   {
-    err_output("overflow: received %d bytes", E32_TX_BUF_BYTES);
+    err_output("overflow: %d > %d", bytes, E32_MAX_PACKET_LENGTH);
     client_err++;
   }
 
@@ -993,7 +955,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *
   // send back an acknowledge of 1 byte to the client
   if(bytes == 0)
   {
-    bytes = sendto(pfd->fd, &client_err, 1, 0, (struct sockaddr*) &client, addrlen);
+    bytes = sendto(fd_sockd, &client_err, 1, 0, (struct sockaddr*) &client, addrlen);
     if(bytes == -1)
     {
       errno_output("unable to send back status to unix socket");
@@ -1002,7 +964,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *
     return 0;
   }
 
-  if(!client_err && e32_transmit(dev, buf, bytes))
+  if(!client_err && e32_transmit(dev, txbuf, bytes))
   {
     err_output("error in transmit\n");
     client_err++;
@@ -1011,13 +973,13 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *
   if(opts->output_standard)
   {
     info_output("transmitted:\n");
-    buf[bytes] = '\0';
-    info_output("%s", buf);
+    txbuf[bytes] = '\0';
+    info_output("%s", txbuf);
     fflush(stdout);
     info_output("\n");
   }
 
-  bytes = sendto(pfd->fd, &client_err, 1, 0, (struct sockaddr*) &client, addrlen);
+  bytes = sendto(fd_sockd, &client_err, 1, 0, (struct sockaddr*) &client, addrlen);
   if(bytes == -1)
   {
     errno_output("unable to send back status to unix socket %s\n", client.sun_path);
@@ -1027,21 +989,13 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, struct pollfd *
 }
 
 static int
-e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, struct pollfd *pfd)
+e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, int fd_sockc)
 {
   ssize_t bytes, ret_bytes;
-  int ready;
   uint8_t client_err; // return to socket clients
   struct sockaddr_un client;
   socklen_t addrlen; // unix domain socket client address
   uint8_t *control;
-
-  ready = pfd->revents & POLLIN;
-
-  if(!ready)
-  {
-    return 0;
-  }
 
   client_err = 0;
   /*
@@ -1051,7 +1005,7 @@ e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, struct pollf
   control = malloc(32);
   addrlen = sizeof(struct sockaddr_un);
 
-  bytes = recvfrom(pfd->fd, control, 32, 0, (struct sockaddr*) &client, &addrlen);
+  bytes = recvfrom(fd_sockc, control, 32, 0, (struct sockaddr*) &client, &addrlen);
   if(bytes == -1)
   {
     errno_output("error receiving from unix domain socket");
@@ -1108,8 +1062,8 @@ e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, struct pollf
     // TODO should we write standard output and verbose?
     if(opts->output_standard)
     {
-      buf[bytes] = '\0';
-      info_output("%s", buf);
+      txbuf[bytes] = '\0';
+      info_output("%s", txbuf);
       fflush(stdout);
     }
   }
@@ -1127,7 +1081,7 @@ e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, struct pollf
     control[0] = client_err;
   }
 
-  bytes = sendto(pfd->fd, control, ret_bytes, 0, (struct sockaddr*) &client, addrlen);
+  bytes = sendto(fd_sockc, control, ret_bytes, 0, (struct sockaddr*) &client, addrlen);
   if(bytes == -1)
     errno_output("unable to send back status to unix socket");
   else if(opts->verbose && opts->output_standard)
@@ -1155,19 +1109,11 @@ e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, struct pollf
 }
 
 static int
-e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ssize_t *total_bytes)
+e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ssize_t *rx_buf_size)
 {
   /* AUX pin transitioned from high->low or low->high */
   ssize_t bytes;
-  int ready;
   int aux;
-
-  ready = pfd[PFD_GPIO_AUX].revents & POLLPRI;
-
-  if(!ready)
-  {
-    return 0;
-  }
 
   lseek(dev->fd_gpio_aux, 0, SEEK_SET);
   gpio_read(dev->fd_gpio_aux, &aux);
@@ -1178,7 +1124,7 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
       debug_output("transition from IDLE to RX state\n");
 
     dev->state = RX;
-    *total_bytes = 0;
+    *rx_buf_size = 0;
   }
   else if(aux == 1 && dev->state == RX)
   {
@@ -1192,19 +1138,19 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
       */
     usleep(54000);
 
-    bytes = read(pfd[PFD_UART].fd, buf+(*total_bytes), E32_TX_BUF_BYTES);
+    bytes = read(pfd[PFD_UART].fd, rxbuf+(*rx_buf_size), RX_BUF_BYTES);
     if(bytes == -1)
     {
       errno_output("e32_poll_gpio_aux() error reading from uart\n");
       return -1;
     }
     
-    *total_bytes += bytes;
+    *rx_buf_size += bytes;
 
     if(dev->verbose)
-      debug_output("e32_poll_gpio_aux(): received %d bytes for a total of %d bytes from uart\n", bytes, *total_bytes);
+      debug_output("e32_poll_gpio_aux(): received %d bytes for a total of %d bytes from uart\n", bytes, *rx_buf_size);
 
-    if(e32_write_output(dev, opts, buf, *total_bytes))
+    if(e32_write_output(dev, opts, rxbuf, *rx_buf_size))
       err_output("error writing outputs after RX to IDLE transition\n");
 
     dev->state = IDLE;
@@ -1228,8 +1174,7 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
 
 /*
 Input Sources
- - stdin
- - pipe
+ - stdin with or without pipe
  - unix domain socket data
  - unix domain socket control
  - file
@@ -1265,7 +1210,7 @@ State Machine
 size_t
 e32_poll(struct E32 *dev, struct options *opts)
 {
-  ssize_t total_bytes;
+  ssize_t rx_buf_size;
   int ret, loop;
   size_t errors;
 
@@ -1276,7 +1221,7 @@ e32_poll(struct E32 *dev, struct options *opts)
 
   errors = 0;
   loop = 1;
-  total_bytes = 0;
+  rx_buf_size = 0;
 
   while(loop)
   {
@@ -1292,35 +1237,30 @@ e32_poll(struct E32 *dev, struct options *opts)
       return ret;
     }
 
-    if(e32_poll_stdin(dev, opts, &pfd[PFD_STDIN], &loop))
+    if(pfd[PFD_STDIN].revents & POLLIN)
     {
-      errors++;
+      errors += e32_poll_stdin(dev, pfd[PFD_STDIN].fd, &loop);
     }
-    assert(errors == 0);
 
-    if(e32_poll_uart(dev, opts, &pfd[PFD_UART], &total_bytes))
+    if(pfd[PFD_UART].revents & POLLIN)
     {
-      errors++;
+      errors+= e32_poll_uart(dev, pfd[PFD_UART].fd, &rx_buf_size);
     }
-    assert(errors == 0);
 
-    if(e32_poll_file(dev, opts, &pfd[PFD_INPUT_FILE], &loop))
+    if(pfd[PFD_INPUT_FILE].revents & POLLIN)
     {
-      errors++;
+      errors += e32_poll_file(dev, opts, pfd[PFD_INPUT_FILE].fd, &loop);
     }
-    assert(errors == 0);
 
-    if(e32_poll_socket_unix_data(dev, opts, &pfd[PFD_SOCKET_UNIX_DATA], &loop))
+    if(pfd[PFD_SOCKET_UNIX_DATA].revents & POLLIN)
     {
-      errors++;
+      errors += e32_poll_socket_unix_data(dev, opts, pfd[PFD_SOCKET_UNIX_DATA].fd, &loop);
     }
-    assert(errors == 0);
 
-    if(e32_poll_socket_unix_control(dev, opts, &pfd[PFD_SOCKET_UNIX_CONTROL]))
+    if( pfd[PFD_SOCKET_UNIX_CONTROL].revents & POLLIN)
     {
-      errors++;
+      errors += e32_poll_socket_unix_control(dev, opts, pfd[PFD_SOCKET_UNIX_CONTROL].fd);
     }
-    assert(errors == 0);
 
     /* If we're already transmitting we will wait to
        go to the IDLE state before polling more inputs
@@ -1330,13 +1270,13 @@ e32_poll(struct E32 *dev, struct options *opts)
       e32_poll_input_disable(opts, pfd);
     }
 
-    if(e32_poll_gpio_aux(dev, opts, pfd, &total_bytes))
+    if(pfd[PFD_GPIO_AUX].revents & POLLPRI)
     {
-      errors++;
+      errors += e32_poll_gpio_aux(dev, opts, pfd, &rx_buf_size);
     }
 
-    assert(errors == 0);
-    assert(total_bytes <= E32_TX_BUF_BYTES);
+    // TODO
+    //assert(total_bytes <= E32_TX_BUF_BYTES);
   }
 
   return errors;
