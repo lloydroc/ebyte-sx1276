@@ -674,7 +674,7 @@ e32_transmit(struct E32 *dev, uint8_t *buf, size_t buf_len)
   }
 
   if(dev->verbose)
-      debug_output("transmitted %d bytes\n", bytes);
+      debug_output("e32_transmit: transmitted %d bytes\n", bytes);
 
   return 0;
 }
@@ -702,7 +702,7 @@ e32_write_output(struct E32 *dev, struct options *opts, uint8_t* buf, const size
     outbytes = fwrite(buf, 1, bytes, opts->output_file);
     if(outbytes != bytes)
     {
-      err_output("only wrote %d of %d bytes to output file", outbytes, bytes);
+      err_output("e32_write_output: only wrote %d of %d bytes to output file", outbytes, bytes);
       ret++;
     }
   }
@@ -714,12 +714,12 @@ e32_write_output(struct E32 *dev, struct options *opts, uint8_t* buf, const size
     addrlen = sizeof(struct sockaddr_un);
 
     if(dev->verbose)
-      debug_output("sending %d bytes to socket %s", bytes, cl->sun_path);
+      debug_output("e32_write_output: sending %d bytes to socket %s", bytes, cl->sun_path);
 
     outbytes = sendto(opts->fd_socket_unix_data, buf, bytes, 0, (struct sockaddr*) cl, addrlen);
     if(outbytes == -1)
     {
-      errno_output("unable to send back status to unix socket. removing from list.");
+      errno_output("e32_write_output: unable to send back status to unix socket. removing from list.");
       list_remove(dev->socket_list, cl);
       ret++;
     }
@@ -843,7 +843,7 @@ e32_poll_stdin(struct E32 *dev, int fd_stdin, int *loop_continue)
   }
 
   if(dev->verbose)
-    debug_output("got %d bytes as input writing to uart\n", bytes);
+    debug_output("e32_poll_stdin: got %d bytes as input writing to uart\n", bytes);
 
   if(e32_transmit(dev, txbuf, bytes))
     return 3;
@@ -890,7 +890,7 @@ e32_poll_file(struct E32 *dev, struct options *opts, int fd_file, int *loop_cont
   bytes = fread(txbuf, 1, E32_MAX_PACKET_LENGTH, opts->input_file);
 
   if(opts->verbose)
-    debug_output("writing %d bytes from file to uart\n", bytes);
+    debug_output("e32_poll_file: writing %d bytes from file to uart\n", bytes);
 
   if(e32_transmit(dev, txbuf, bytes))
   {
@@ -937,7 +937,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, i
 
   if(opts->verbose)
   {
-    debug_output("received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
+    debug_output("e32_poll_socket_unix_data: received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
   }
 
   // sending 0 bytes will register and we'll add to the client list
@@ -949,7 +949,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, i
     list_add_first(dev->socket_list, new_client);
 
     if(opts->verbose)
-      debug_output("registered client %d at %s\n", list_size(dev->socket_list), client.sun_path);
+      debug_output("e32_poll_socket_unix_data: registered client %d at %s\n", list_size(dev->socket_list), client.sun_path);
   }
 
   // send back an acknowledge of 1 byte to the client
@@ -958,7 +958,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, i
     bytes = sendto(fd_sockd, &client_err, 1, 0, (struct sockaddr*) &client, addrlen);
     if(bytes == -1)
     {
-      errno_output("unable to send back status to unix socket");
+      errno_output("e32_poll_socket_unix_data: unable to send back status to unix socket");
       return 1;
     }
     return 0;
@@ -966,13 +966,13 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, i
 
   if(!client_err && e32_transmit(dev, txbuf, bytes))
   {
-    err_output("error in transmit\n");
+    err_output("e32_poll_socket_unix_data: error in transmit\n");
     client_err++;
   }
 
   if(opts->output_standard)
   {
-    info_output("transmitted:\n");
+    info_output("e32_poll_socket_unix_data: transmitted:\n");
     txbuf[bytes] = '\0';
     info_output("%s", txbuf);
     fflush(stdout);
@@ -982,7 +982,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, i
   bytes = sendto(fd_sockd, &client_err, 1, 0, (struct sockaddr*) &client, addrlen);
   if(bytes == -1)
   {
-    errno_output("unable to send back status to unix socket %s\n", client.sun_path);
+    errno_output("e32_poll_socket_unix_data: unable to send back status to unix socket %s\n", client.sun_path);
   }
 
   return client_err;
@@ -1008,15 +1008,15 @@ e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, int fd_sockc
   bytes = recvfrom(fd_sockc, control, 32, 0, (struct sockaddr*) &client, &addrlen);
   if(bytes == -1)
   {
-    errno_output("error receiving from unix domain socket");
+    errno_output("e32_poll_socket_unix_control: error receiving from unix domain socket");
     client_err = 1;
   }
 
-  debug_output("received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
+  debug_output("e32_poll_socket_unix_control: received %d bytes from unix domain socket: %s\n", bytes, client.sun_path);
 
   if(e32_set_mode(dev, SLEEP))
   {
-    err_output("unable to go to sleep mode\n");
+    err_output("e32_poll_socket_unix_control: unable to go to sleep mode\n");
     client_err = 2;
   }
 
@@ -1070,20 +1070,20 @@ e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, int fd_sockc
 
   if(e32_set_mode(dev, NORMAL))
   {
-    err_output("unable to go to normal mode\n");
+    err_output("e32_poll_socket_unix_control: unable to go to normal mode\n");
     client_err = 8;
   }
 
   if(client_err)
   {
-    err_output("client error %d\n", client_err);
+    err_output("e32_poll_socket_unix_control: client error %d\n", client_err);
     ret_bytes = 1;
     control[0] = client_err;
   }
 
   bytes = sendto(fd_sockc, control, ret_bytes, 0, (struct sockaddr*) &client, addrlen);
   if(bytes == -1)
-    errno_output("unable to send back status to unix socket");
+    errno_output("e32_poll_socket_unix_control: unable to send back status to unix socket");
   else if(opts->verbose && opts->output_standard)
   {
     debug_output("writing back %d bytes to unix domain socket: %s\n", ret_bytes, client.sun_path);
@@ -1121,52 +1121,45 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
   if(aux == 0 && dev->state == IDLE)
   {
     if(dev->verbose)
-      debug_output("transition from IDLE to RX state\n");
+      debug_output("e32_poll_gpio_aux: transition from IDLE to RX state\n");
 
     dev->state = RX;
     *rx_buf_size = 0;
+    e32_poll_input_disable(opts, pfd);
   }
   else if(aux == 1 && dev->state == RX)
   {
     if(dev->verbose)
-      debug_output("transition from RX to IDLE state\n");
-
-    /* we need to sleep and read from the uart again as remaining
-      * bytes are not ready until AFTER the AUX pin transitions from
-      * low to high. If we don't do this we will leave bytes in the
-      * buffer
-      */
-    usleep(54000);
+      debug_output("e32_poll_gpio_aux: transition from RX to IDLE state\n");
 
     bytes = read(pfd[PFD_UART].fd, rxbuf+(*rx_buf_size), RX_BUF_BYTES);
     if(bytes == -1)
     {
-      errno_output("e32_poll_gpio_aux() error reading from uart\n");
+      errno_output("e32_poll_gpio_aux: error reading from uart\n");
       return -1;
     }
-    
+
     *rx_buf_size += bytes;
 
     if(dev->verbose)
-      debug_output("e32_poll_gpio_aux(): received %d bytes for a total of %d bytes from uart\n", bytes, *rx_buf_size);
+      debug_output("e32_poll_gpio_aux: received %d bytes for a total of %d bytes from uart\n", bytes, *rx_buf_size);
 
     if(e32_write_output(dev, opts, rxbuf, *rx_buf_size))
-      err_output("error writing outputs after RX to IDLE transition\n");
+      err_output("e32_poll_gpio_aux: error writing outputs after RX to IDLE transition\n");
 
     dev->state = IDLE;
+    e32_poll_input_enable(opts, pfd);
   }
   else if(aux == 0 && dev->state == TX)
   {
     if(dev->verbose)
-      debug_output("transition from IDLE to TX state\n");
+      debug_output("e32_poll_gpio_aux: transition from IDLE to TX state\n");
   }
   else if(aux == 1 && dev->state == TX)
   {
-    usleep(54000);
     if(dev->verbose)
-      debug_output("transition from TX to IDLE state\n");
+      debug_output("e32_poll_gpio_aux: transition from TX to IDLE state\n");
     dev->state = IDLE;
-    e32_poll_input_enable(opts, pfd);
   }
 
   return 0;
@@ -1179,11 +1172,6 @@ Input Sources
  - unix domain socket control
  - file
 
- Read up to E32_TX_BUF_BYTES=512 bytes into buffer from the input source then disable it from polling.
- Then write the buffer to the UART which will cause the AUX pin to go low. When the AUX pin goes
- low we'll go into the TX state of the state machine. Once, the packet is sent out the e32 then
- eventually the AUX pin will go high again. We then enter the IDLE state.
- From here we can enable polling of the input again.
 
 Output Sources
  - stdout
@@ -1199,12 +1187,8 @@ State Machine
  We transition states when AUX transitions from high to low or low to high. When AUX transitions
  if the UART is ready to read then we go in to the RX state, if one of the input sources are ready
  we go into the TX state. In both the TX and RX state we don't go back into IDLE unless AUX
- transitionsn back to high.
+ transitions back to high.
 
- TODO it has not been tested reading and writing at the same time. I don't think the e32 can even
- do this. However, if we're already in TX then AUX cannot really transition to trigger going into
- RX mode anyhow. However, if we're in RX and an input source is ready we'd go into TX mode and
- this may break.
 
 */
 size_t
@@ -1237,14 +1221,19 @@ e32_poll(struct E32 *dev, struct options *opts)
       return ret;
     }
 
-    if(pfd[PFD_STDIN].revents & POLLIN)
+    if(pfd[PFD_GPIO_AUX].revents & POLLPRI)
     {
-      errors += e32_poll_stdin(dev, pfd[PFD_STDIN].fd, &loop);
+      errors += e32_poll_gpio_aux(dev, opts, pfd, &rx_buf_size);
     }
 
     if(pfd[PFD_UART].revents & POLLIN)
     {
       errors+= e32_poll_uart(dev, pfd[PFD_UART].fd, &rx_buf_size);
+    }
+
+    if(pfd[PFD_STDIN].revents & POLLIN)
+    {
+      errors += e32_poll_stdin(dev, pfd[PFD_STDIN].fd, &loop);
     }
 
     if(pfd[PFD_INPUT_FILE].revents & POLLIN)
@@ -1260,19 +1249,6 @@ e32_poll(struct E32 *dev, struct options *opts)
     if( pfd[PFD_SOCKET_UNIX_CONTROL].revents & POLLIN)
     {
       errors += e32_poll_socket_unix_control(dev, opts, pfd[PFD_SOCKET_UNIX_CONTROL].fd);
-    }
-
-    /* If we're already transmitting we will wait to
-       go to the IDLE state before polling more inputs
-    */
-    if(dev->state == TX)
-    {
-      e32_poll_input_disable(opts, pfd);
-    }
-
-    if(pfd[PFD_GPIO_AUX].revents & POLLPRI)
-    {
-      errors += e32_poll_gpio_aux(dev, opts, pfd, &rx_buf_size);
     }
 
     // TODO

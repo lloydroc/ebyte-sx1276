@@ -120,8 +120,17 @@ main(int argc, char *argv[])
 
   if(opts.daemon)
   {
-    become_daemon();
-    info_output("daemon started pid=%d", getpid());
+    err = become_daemon();
+    if(err)
+    {
+      err_output("mail: error becoming daemon: %d\n", err);
+      goto cleanup;
+    }
+    if(write_pidfile("/run/e32.pid"))
+    {
+      errno_output("unable to write pid file\n");
+    }
+    info_output("daemon started pid=%ld", getpid());
   }
 
   err |= e32_poll(&dev, &opts);

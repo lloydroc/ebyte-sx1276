@@ -52,13 +52,23 @@ tty_open(char *pty_name, int *tty_fd, struct termios *tty)
 
   if(tcgetattr(*tty_fd, tty) == -1)
   {
-    err_output("unable to get tty attributes for %s\n", pty_name);
+    errno_output("tty_open: unable to get tty attributes for %s\n", pty_name);
     close(*tty_fd);
     return -1;
   }
 
-  cfsetispeed(tty, B9600);
-  cfsetospeed(tty, B9600);
+  if(cfsetispeed(tty, B9600) == -1)
+  {
+    errno_output("tty_open: unable to uart input speed\n");
+    return -1;
+  }
+
+  if(cfsetospeed(tty, B9600) == -1)
+  {
+    errno_output("tty_open: unable to set output speed\n");
+    return -1;
+  }
+
   cfmakeraw(tty);
 
   tty->c_cflag |= CREAD | CLOCAL;
@@ -69,8 +79,17 @@ tty_open(char *pty_name, int *tty_fd, struct termios *tty)
     return -1;
   }
 
-  tcflush(*tty_fd, TCIFLUSH);
-  tcdrain(*tty_fd);
+  if(tcflush(*tty_fd, TCIFLUSH) == -1)
+  {
+    errno_output("tty_open: unable to flush terminal\n");
+    return -1;
+  }
+
+  if(tcdrain(*tty_fd) == -1)
+  {
+    errno_output("tty_open: unable to drain terminal\n");
+    return -1;
+  }
 
   return 0;
 }

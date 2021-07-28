@@ -17,7 +17,7 @@ parser.add_argument('--datasock',
     default="/run/e32.data")
 parser.add_argument('--clientsock',
     help="client socket for e32 to send data this program",
-    default=str(Path.home())+"/client.sock")
+    default=str(Path.home())+"/e32.rx.data")
 
 args = parser.parse_args()
 
