@@ -1,8 +1,4 @@
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
+
 #include "become_daemon.h"
 
 int // returns 0 on success non-zero on error
@@ -41,5 +37,21 @@ become_daemon()
   if(dup2(STDIN_FILENO, STDERR_FILENO) != STDERR_FILENO)
     return 6;
 
+  return 0;
+}
+
+int
+write_pidfile(char *file)
+{
+  pid_t pid;
+  FILE *fp;
+  fp = fopen(file, "w");
+  if(fp == NULL)
+  {
+    return 1;
+  }
+  pid = getpid();
+  fprintf(fp, "%d\n", pid);
+  fclose(fp);
   return 0;
 }
