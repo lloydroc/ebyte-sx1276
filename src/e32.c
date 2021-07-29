@@ -738,6 +738,9 @@ e32_write_output(struct E32 *dev, struct options *opts, uint8_t* buf, const size
 static void
 e32_poll_input_enable(struct options *opts, struct pollfd pfd[])
 {
+  if(opts->verbose)
+    debug_output("e32_poll_input_enable\n");
+
   if(opts->input_standard)
   {
     pfd[PFD_STDIN].fd = fileno(stdin);
@@ -766,6 +769,9 @@ e32_poll_input_enable(struct options *opts, struct pollfd pfd[])
 static void
 e32_poll_input_disable(struct options *opts, struct pollfd pfd[])
 {
+  if(opts->verbose)
+    debug_output("e32_poll_input_disable\n");
+
   if(opts->input_standard)
   {
     pfd[PFD_STDIN].fd = -1;
@@ -867,14 +873,14 @@ e32_poll_uart(struct E32 *dev, int fd_uart, ssize_t *rx_buf_size)
   bytes = read(fd_uart, rxbuf+(*rx_buf_size), RX_BUF_BYTES);
   if(bytes == -1)
   {
-    errno_output("e32_poll_uart() error reading from uart, fd=%d, buf=%p, total=%p, mode=%d\n", fd_uart, rxbuf, rx_buf_size, dev->mode);
+    errno_output("e32_poll_uart error reading from uart, fd=%d, buf=%p, total=%p, mode=%d\n", fd_uart, rxbuf, rx_buf_size, dev->mode);
     return 1;
   }
 
   *rx_buf_size += bytes;
 
   if(dev->verbose)
-    debug_output("e32_poll_uart(): received %d bytes for a total of %ld bytes from uart\n", bytes, *rx_buf_size);
+    debug_output("e32_poll_uart: received %d bytes for a total of %ld bytes from uart\n", bytes, *rx_buf_size);
 
   return 0;
 }
@@ -1154,12 +1160,14 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
   {
     if(dev->verbose)
       debug_output("e32_poll_gpio_aux: transition from IDLE to TX state\n");
+    e32_poll_input_disable(opts, pfd);
   }
   else if(aux == 1 && dev->state == TX)
   {
     if(dev->verbose)
       debug_output("e32_poll_gpio_aux: transition from TX to IDLE state\n");
     dev->state = IDLE;
+    e32_poll_input_enable(opts, pfd);
   }
 
   return 0;
@@ -1206,6 +1214,7 @@ e32_poll(struct E32 *dev, struct options *opts)
   errors = 0;
   loop = 1;
   rx_buf_size = 0;
+  enum E32_state prev_state;
 
   while(loop)
   {
@@ -1220,6 +1229,8 @@ e32_poll(struct E32 *dev, struct options *opts)
       errno_output("poll");
       return ret;
     }
+
+    prev_state = dev->state;
 
     if(pfd[PFD_GPIO_AUX].revents & POLLPRI)
     {
@@ -1251,8 +1262,19 @@ e32_poll(struct E32 *dev, struct options *opts)
       errors += e32_poll_socket_unix_control(dev, opts, pfd[PFD_SOCKET_UNIX_CONTROL].fd);
     }
 
-    // TODO
-    //assert(total_bytes <= E32_TX_BUF_BYTES);
+    /*
+      Take a situation where we are transferring a file.
+      This file will be ready for reading much faster than can
+      transmit it's bytes. So we'll first read bytes into the buffer
+      and transmit them. Before the AUX pin can go low we can do this
+      many times. Hence we need to disable inputs until the AUX pin
+      goes back high and then they will be enabled. This logic to
+      disable reading more input before the AUX pin can react.
+    */
+    if(prev_state == IDLE && dev->state == TX)
+    {
+      e32_poll_input_disable(opts, pfd);
+    }
   }
 
   return errors;
