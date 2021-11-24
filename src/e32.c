@@ -932,12 +932,12 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, i
   bytes = recvfrom(fd_sockd, txbuf, E32_MAX_PACKET_LENGTH+1, 0, (struct sockaddr*) &client, &addrlen);
   if(bytes == -1)
   {
-    errno_output("error receiving from unix domain socket");
+    errno_output("e32_poll_socket_unix_data: error receiving from unix domain socket");
     return 1;
   }
   else if(bytes > E32_MAX_PACKET_LENGTH)
   {
-    err_output("overflow: %d > %d", bytes, E32_MAX_PACKET_LENGTH);
+    err_output("e32_poll_socket_unix_data: overflow: %d > %d", bytes, E32_MAX_PACKET_LENGTH);
     client_err++;
   }
 

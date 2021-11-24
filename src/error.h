@@ -7,10 +7,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 // use the extern use_syslog variable to print to stdout/stderr or syslog
-#include "options.h"
+extern int use_syslog;
+
 #define MAX_ENAME 106
 
 void

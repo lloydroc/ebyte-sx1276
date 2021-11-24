@@ -13,8 +13,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include "error.h"
-
-extern int use_syslog;
+#include "socket.h"
 
 struct options
 {
@@ -34,7 +33,6 @@ struct options
   uint8_t settings_write_input[6];
   FILE* input_file;
   FILE* output_file;
-  struct sockaddr_in socket_udp_dest;
   int fd_socket_unix_data, fd_socket_unix_control;
   struct sockaddr_un socket_unix_data, socket_unix_control;
 };
