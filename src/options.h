@@ -30,6 +30,7 @@ struct options
   int daemon;
   int input_standard;
   int output_standard;
+  int aux_transition_additional_delay;
   char tty_name[64];
   uint8_t settings_write_input[6];
   FILE* input_file;

@@ -866,7 +866,7 @@ e32_poll_stdin(struct E32 *dev, int fd_stdin, int *loop_continue)
 }
 
 static int
-e32_poll_uart(struct E32 *dev, int fd_uart, ssize_t *rx_buf_size)
+e32_poll_uart(struct E32 *dev, struct options *opts, int fd_uart, ssize_t *rx_buf_size)
 {
   ssize_t bytes;
 
@@ -875,6 +875,17 @@ e32_poll_uart(struct E32 *dev, int fd_uart, ssize_t *rx_buf_size)
   {
     errno_output("e32_poll_uart error reading from uart, fd=%d, buf=%p, total=%p, mode=%d\n", fd_uart, rxbuf, rx_buf_size, dev->mode);
     return 1;
+  }
+
+  /* some Raspberry Pi Models will buffer > 1 byte at a time which is ideal
+   * the implication here is after the AUX pin transitions when reading bytes
+   * we will leave bytes in the buffer. If we detect this we'll set an additional
+   * delay where after the AUX pin transitions we will delay before reading the
+   * additional bytes.
+   */
+  if (bytes > 1)
+  {
+    opts->aux_transition_additional_delay = 1;
   }
 
   *rx_buf_size += bytes;
@@ -1138,6 +1149,13 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
     if(dev->verbose)
       debug_output("e32_poll_gpio_aux: transition from RX to IDLE state\n");
 
+    if(opts->aux_transition_additional_delay)
+    {
+      if(dev->verbose)
+        debug_output("e32_poll_gpio_aux: additional sleep for uart buffered data\n");
+      usleep(54000);
+    }
+
     bytes = read(pfd[PFD_UART].fd, rxbuf+(*rx_buf_size), RX_BUF_BYTES);
     if(bytes == -1)
     {
@@ -1239,7 +1257,7 @@ e32_poll(struct E32 *dev, struct options *opts)
 
     if(pfd[PFD_UART].revents & POLLIN)
     {
-      errors+= e32_poll_uart(dev, pfd[PFD_UART].fd, &rx_buf_size);
+      errors+= e32_poll_uart(dev, opts, pfd[PFD_UART].fd, &rx_buf_size);
     }
 
     if(pfd[PFD_STDIN].revents & POLLIN)
