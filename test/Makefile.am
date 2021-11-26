@@ -10,15 +10,15 @@ test_packet_LDADD = ../src/packet.o ../src/message.o ../src/convert.o ../src/err
 test_message_CFLAGS = -I$(top_srcdir)/src
 test_message_LDADD = ../src/packet.o ../src/message.o ../src/convert.o ../src/error.o ../src/misc.o -lm
 
-test_options_tx_CFLAGS = -I$(top_srcdir)/src
-test_options_tx_LDADD = ../src/options_tx.o ../src/error.o ../src/socket.o ../src/misc.o -lm
+test_options_lorax_CFLAGS = -I$(top_srcdir)/src
+test_options_lorax_LDADD = ../src/options_lorax.o ../src/error.o ../src/socket.o ../src/misc.o -lm
 
 test_misc_CFLAGS = -I$(top_src)/src
 test_misc_LDADD = ../src/misc.o ../src/error.o -lm
 
-check_PROGRAMS = test_options test_options_tx test_list test_packet test_message test_misc
+check_PROGRAMS = test_options test_options_lorax test_list test_packet test_message test_misc
 test_options_SOURCES = test_options.c $(top_builddir)/src/options.h $(top_builddir)/src/error.h $(top_builddir)/src/socket.h
-test_options_tx_SOURCES = test_options_tx.c $(top_builddir)/src/options_tx.h $(top_builddir)/src/error.h $(top_builddir)/src/socket.h $(top_builddir)/src/misc.h
+test_options_lorax_SOURCES = test_options_lorax.c $(top_builddir)/src/options_lorax.h $(top_builddir)/src/error.h $(top_builddir)/src/socket.h $(top_builddir)/src/misc.h
 test_list_SOURCES = test_list.c $(top_builddir)/src/list.h
 test_packet_SOURCES = test_packet.c $(top_builddir)/src/packet.h $(top_builddir)/src/message.h $(top_builddir)/src/convert.h $(top_builddir)/src/error.h $(top_builddir)/src/misc.h
 test_message_SOURCES = test_message.c $(top_builddir)/src/message.h $(top_builddir)/src/packet.h $(top_builddir)/src/convert.h $(top_builddir)/src/error.h $(top_builddir)/src/misc.h

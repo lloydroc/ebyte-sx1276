@@ -51,6 +51,10 @@ src/Makefile
 config.h
 tags
 e32
+lorax
+loratx
+lorax_echo
+src/*.gdb
 \#*#
 \.\#*
 .vscode
