@@ -69,6 +69,7 @@ options_init(struct options *opts)
   opts->output_file = NULL;
   opts->fd_socket_unix_data = -1;
   opts->fd_socket_unix_control = -1;
+  opts->aux_transition_additional_delay = 0;
   memset(opts->settings_write_input, 0, sizeof(opts->settings_write_input));
   snprintf(opts->tty_name, 64, "/dev/serial0");
 }
