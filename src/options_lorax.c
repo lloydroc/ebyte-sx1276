@@ -5,7 +5,7 @@ int use_syslog = 0;
 
 void options_lorax_usage(char *progname)
 {
-    struct OptionsTx opts;
+    struct OptionsLorax opts;
     options_lorax_init(&opts);
     printf("Usage: %s [OPTIONS]\n", progname);
     printf("Version %s\n\n", VERSION);
@@ -23,7 +23,7 @@ void options_lorax_usage(char *progname)
 }
 
 int
-options_lorax_get_mac_address(struct OptionsTx *opts, char *iface)
+options_lorax_get_mac_address(struct OptionsLorax *opts, char *iface)
 {
     if(get_mac_address(opts->mac_address, iface) == 0)
     {
@@ -34,7 +34,7 @@ options_lorax_get_mac_address(struct OptionsTx *opts, char *iface)
 }
 
 void
-options_lorax_init(struct OptionsTx *opts)
+options_lorax_init(struct OptionsLorax *opts)
 {
     opts->verbose = false;
     opts->help = false;
@@ -48,7 +48,7 @@ options_lorax_init(struct OptionsTx *opts)
 }
 
 int
-options_lorax_deinit(struct OptionsTx *opts)
+options_lorax_deinit(struct OptionsLorax *opts)
 {
     if(opts->iface_default)
         free(opts->iface_default);
@@ -56,7 +56,7 @@ options_lorax_deinit(struct OptionsTx *opts)
 }
 
 int
-options_lorax_parse(struct OptionsTx *opts, int argc, char *argv[])
+options_lorax_parse(struct OptionsLorax *opts, int argc, char *argv[])
 {
     int option_index, c;
     int err = 0;
@@ -159,6 +159,6 @@ options_lorax_parse(struct OptionsTx *opts, int argc, char *argv[])
     return err;
 }
 
-void options_lorax_print(struct OptionsTx *opts)
+void options_lorax_print(struct OptionsLorax *opts)
 {
 }

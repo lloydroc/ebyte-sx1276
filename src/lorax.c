@@ -10,7 +10,7 @@ uint8_t message_rx_buf[64];
 #define CONNECTION_RETRY_SECONDS 3
 
 int
-lorax_e32_init(struct OptionsTx *opts)
+lorax_e32_init(struct OptionsLorax *opts)
 {
     neighbors = malloc(sizeof(struct List));
     list_init(neighbors, neighbor_match, neighbor_destroy);
@@ -40,7 +40,7 @@ lorax_e32_destroy()
 }
 
 int
-lorax_e32_register(struct OptionsTx *opts)
+lorax_e32_register(struct OptionsLorax *opts)
 {
     if(opts->verbose)
         debug_output("lorax_e32_register: registering client\n");
@@ -55,7 +55,7 @@ lorax_e32_register(struct OptionsTx *opts)
 }
 
 static int
-lorax_send_message(struct OptionsTx *opts, struct sockaddr_un *sock_dest, struct Message *message)
+lorax_send_message(struct OptionsLorax *opts, struct sockaddr_un *sock_dest, struct Message *message)
 {
     size_t message_len;
 
@@ -71,7 +71,7 @@ lorax_send_message(struct OptionsTx *opts, struct sockaddr_un *sock_dest, struct
 }
 
 static int
-lorax_send_packet(struct OptionsTx *opts, uint8_t *packet, ssize_t packet_size)
+lorax_send_packet(struct OptionsLorax *opts, uint8_t *packet, ssize_t packet_size)
 {
     if(opts->verbose)
     {
@@ -83,7 +83,7 @@ lorax_send_packet(struct OptionsTx *opts, uint8_t *packet, ssize_t packet_size)
 }
 
 static int
-lorax_send_broadcast_packet(struct OptionsTx *opts)
+lorax_send_broadcast_packet(struct OptionsLorax *opts)
 {
     int err;
     struct PacketHeader *packet;
@@ -125,7 +125,7 @@ lorax_find_neighbor_by_address(uint8_t address[])
 }
 
 static int
-lorax_neighbor_loop(struct OptionsTx *opts)
+lorax_neighbor_loop(struct OptionsLorax *opts)
 {
     struct Neighbor *neighbor;
     struct Connection *connection;
@@ -218,7 +218,7 @@ lorax_neighbor_loop(struct OptionsTx *opts)
     Add or update the neighbor to our neighbor list.
 */
 static int
-lorax_e32_process_broadcast_packet(struct PacketHeader *packet, struct OptionsTx *opts)
+lorax_e32_process_broadcast_packet(struct PacketHeader *packet, struct OptionsLorax *opts)
 {
     struct Neighbor *neighbor;
     uint8_t *num_neighbors_ptr;
@@ -258,7 +258,7 @@ lorax_e32_process_broadcast_packet(struct PacketHeader *packet, struct OptionsTx
     an error packet.
 */
 int
-lorax_e32_process_packet(struct OptionsTx *opts, uint8_t *packet, size_t len)
+lorax_e32_process_packet(struct OptionsLorax *opts, uint8_t *packet, size_t len)
 {
     //uint8_t packet_to_send_header;
     struct PacketHeader *packet_received;
@@ -348,7 +348,7 @@ lorax_e32_process_packet(struct OptionsTx *opts, uint8_t *packet, size_t len)
     known neighors in which we can send a message back.
 */
 int
-lorax_e32_process_message(struct OptionsTx *opts, uint8_t *packet_bytes, size_t len, struct sockaddr_un *sock_source)
+lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *packet_bytes, size_t len, struct sockaddr_un *sock_source)
 {
 
     int err;
@@ -431,7 +431,7 @@ lorax_e32_process_message(struct OptionsTx *opts, uint8_t *packet_bytes, size_t 
 }
 
 int
-lorax_e32_poll(struct OptionsTx *opts)
+lorax_e32_poll(struct OptionsLorax *opts)
 {
     struct pollfd pfd[2];
 

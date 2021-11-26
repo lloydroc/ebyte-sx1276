@@ -1,5 +1,5 @@
-#ifndef OPTIONS_TX_H
-#define OPTIONS_TX_H
+#ifndef OPTIONS_LORAX_H
+#define OPTIONS_LORAX_H
 
 #include <getopt.h>
 #include <netinet/in.h>
@@ -80,7 +80,7 @@ seems source_sock isn't used and dest_fd isn't used
 
 */
 
-struct OptionsTx
+struct OptionsLorax
 {
     bool verbose;
     bool help;
@@ -122,18 +122,18 @@ void
 options_lorax_usage(char *progname);
 
 void
-options_lorax_init(struct OptionsTx *opts);
+options_lorax_init(struct OptionsLorax *opts);
 
 int
-options_lorax_deinit(struct OptionsTx *opts);
+options_lorax_deinit(struct OptionsLorax *opts);
 
 int
-options_lorax_get_mac_address(struct OptionsTx *opts, char *iface);
+options_lorax_get_mac_address(struct OptionsLorax *opts, char *iface);
 
 int
-options_lorax_parse(struct OptionsTx *opts, int argc, char *argv[]);
+options_lorax_parse(struct OptionsLorax *opts, int argc, char *argv[]);
 
 void
-options_lorax_print(struct OptionsTx *opts);
+options_lorax_print(struct OptionsLorax *opts);
 
 #endif

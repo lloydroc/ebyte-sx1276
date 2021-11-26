@@ -18,21 +18,21 @@
 #include "convert.h"
 
 int
-lorax_e32_init(struct OptionsTx *opts);
+lorax_e32_init(struct OptionsLorax *opts);
 
 int
 lorax_e32_destroy();
 
 int
-lorax_e32_register(struct OptionsTx *opts);
+lorax_e32_register(struct OptionsLorax *opts);
 
 int
-lorax_e32_poll(struct OptionsTx *opts);
+lorax_e32_poll(struct OptionsLorax *opts);
 
 int
-lorax_e32_process_packet(struct OptionsTx *opts, uint8_t *packet, size_t len);
+lorax_e32_process_packet(struct OptionsLorax *opts, uint8_t *packet, size_t len);
 
 int
-lorax_join(struct OptionsTx *opts);
+lorax_join(struct OptionsLorax *opts);
 
 #endif

@@ -52,7 +52,7 @@ config.h
 tags
 e32
 lorax
-loratx
+lorax_message
 lorax_echo
 src/*.gdb
 \#*#
