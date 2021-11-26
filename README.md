@@ -14,12 +14,12 @@ This code has also been run on a Pine64 and Orange Pi Zero.
 
 # High Level Interface - Lorax
 
-The high level interface is called `lorax`. These goals of this high level interface is to send structured data over Lora that is reliable. This data is reliable from the criteria that we have checksums the `packets` that are sent and will retry when `messages` are not responded to. Here are the details of the `lorax` interface:
+The high level interface is called lorax. These goals of this high level interface is to send structured data over Lora that is reliable. This data is reliable from the criteria that we have checksums for the packets that are sent and will retry when messages are not responded to. Here are the details of the lorax interface:
 
-1. Interaction are over sockets and use a `message` structure similar to the Internet Protocol
-2. The `message` is processed and converted to a `packet` that is sent over the air with Lora
-3. For reliability we will retry failed packets we don't get responses for or have failed checksums
-4. Broadcasts are sent out and neighbors are stored. This allows us to discover who our neighbors are.
+1. Interaction over sockets uses a message structure similar to the Internet Protocol
+2. The message is processed and converted to a packet that is sent over the air with Lora
+3. For reliability we will retry failed packets we don't get responses for, or have failed checksums
+4. Broadcasts are sent out and neighbors are stored. This allows us to discover who our neighbors are
 
 # Getting Started
 
