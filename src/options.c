@@ -156,7 +156,7 @@ options_parse_settings(struct options *opts, char *settings)
 
   if(strnlen(settings, 13) != 12)
   {
-    fprintf(stderr, "options not of length 12");
+    fprintf(stderr, "options not of length 12\n");
     err = 1;
     goto bad_settings;
   }

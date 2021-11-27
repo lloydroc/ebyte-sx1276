@@ -51,6 +51,7 @@ src/Makefile
 config.h
 tags
 e32
+e32-*\.*\.\.
 lorax
 lorax_message
 lorax_echo

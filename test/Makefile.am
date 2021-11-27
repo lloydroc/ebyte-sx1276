@@ -13,7 +13,7 @@ test_message_LDADD = ../src/packet.o ../src/message.o ../src/convert.o ../src/er
 test_options_lorax_CFLAGS = -I$(top_srcdir)/src
 test_options_lorax_LDADD = ../src/options_lorax.o ../src/error.o ../src/socket.o ../src/misc.o -lm
 
-test_misc_CFLAGS = -I$(top_src)/src
+test_misc_CFLAGS = -I$(top_srcdir)/src
 test_misc_LDADD = ../src/misc.o ../src/error.o -lm
 
 check_PROGRAMS = test_options test_options_lorax test_list test_packet test_message test_misc
