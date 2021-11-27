@@ -13,12 +13,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Autotools autoreconf 
+    - name: Autotools autoreconf
       run: ./autogen.sh
     - name: configure
       run: ./configure
     - name: make
       run: make
+    - name: interfaces
+      run: ip address
     - name: make check
       run: make check
     - name: make distcheck
