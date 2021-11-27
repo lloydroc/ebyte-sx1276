@@ -55,8 +55,16 @@ lorax
 lorax_message
 lorax_echo
 src/*.gdb
+*.log
+*.trs
 \#*#
 \.\#*
 .vscode
+test/test_list
+test/test_message
+test/test_misc
+test/test_options
+test/test_options_lorax
+test/test_packet
 
 /e32-*.tar.gz

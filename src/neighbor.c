@@ -46,22 +46,22 @@ neighbor_destroy(void *data)
 void
 neighbor_print(struct Neighbor *neighbor)
 {
+    char fmt[] = "%02x %02x%02x%02x%02x%02x%02x %02x %02x %s\n";
     char *rfc8601;
 
-    debug_output("%d ", neighbor->type);
-
-    for(int i=0; i<NEIGHBOR_ADDRESS_SIZE; i++)
-        debug_output("%02x", neighbor->address[i]);
-
-    debug_output(" %d %d ", neighbor->num_neighbors, list_size(neighbor->connections));
-
     rfc8601 = rfc8601_timespec(&neighbor->broadcast_time);
-    debug_output("%s\n", rfc8601);
-
-    /* FIXME */
-    //rfc8601 = rfc8601_timespec(&neighbor->state_time);
-    //debug_output(" connection_state: %d\n", neighbor->connection_state);
-    //debug_output(" state_time: %s\n", rfc8601);
+    debug_output(fmt,
+        neighbor->type,
+        neighbor->address[0],
+        neighbor->address[1],
+        neighbor->address[2],
+        neighbor->address[3],
+        neighbor->address[4],
+        neighbor->address[5],
+        neighbor->num_neighbors,
+        list_size(neighbor->connections),
+        rfc8601
+    );
 
     free(rfc8601);
 }

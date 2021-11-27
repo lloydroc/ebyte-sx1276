@@ -4,7 +4,7 @@
 #include "error.h"
 
 
-struct OptionsTx opts;
+struct OptionsLorax opts;
 
 int
 main(int argc, char *argv[])

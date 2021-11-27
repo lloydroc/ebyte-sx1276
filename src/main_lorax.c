@@ -18,15 +18,6 @@ main(int argc, char *argv[])
         return err;
     }
 
-    lorax_e32_init(&opts);
-
-    if(lorax_e32_register(&opts))
-    {
-        err_output("main: unable to register to the e32\n");
-        err = 1;
-        goto cleanup;
-    }
-
     if(opts.daemon)
     {
         err = become_daemon();
@@ -35,16 +26,38 @@ main(int argc, char *argv[])
             err_output("lorax: error becoming daemon: %d\n", err);
             goto cleanup;
         }
-        if(mkdir("/run/lorax", S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH))
-        {
-            return 2;
-            errno_output("creating directory /run/lorax\n");
-        }
-        if(write_pidfile("/run/lorax/lorax.pid"))
-        {
-            errno_output("unable to write pid file\n");
-        }
         info_output("daemon started pid=%ld", getpid());
+    }
+
+    if(opts.systemd)
+    {
+        if(access(opts.rundir, F_OK ))
+        {
+            if(mkdir(opts.rundir, S_IRUSR | S_IXUSR | S_IWUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH))
+            {
+                errno_output("creating directory %s\n", opts.rundir);
+            }
+        }
+        // FIXME
+        //chmod("/run/lorax/messages", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+        if(write_pidfile(opts.pidfile))
+        {
+            errno_output("unable to write pid file %s\n", opts.pidfile);
+        }
+    }
+
+    if(opts.verbose)
+    {
+        options_lorax_print(&opts);
+    }
+
+    lorax_e32_init(&opts);
+
+    if(lorax_e32_register(&opts))
+    {
+        err_output("main: unable to register to the e32\n");
+        err = 1;
+        goto cleanup;
     }
 
     if(lorax_e32_poll(&opts))

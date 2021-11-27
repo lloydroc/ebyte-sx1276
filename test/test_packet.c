@@ -30,7 +30,7 @@ main(int argc, char *argv[])
   memset(destination_address, 2, 6);
 
   /* make a packet with no data */
-  assert(packet_make_unitialized_packet(&packet, 0) == 0);
+  assert(packet_make_uninitialized_packet(&packet, 0) == 0);
   assert(0 == packet_get_data_size(packet));
   packet_make_partial(packet, PACKET_DATA, source_address, destination_address, 100, 200);
 
@@ -49,7 +49,7 @@ main(int argc, char *argv[])
   free(packet);
 
   /* make a packet with some data in it */
-  assert(packet_make_unitialized_packet(&packet, data_len) == 0);
+  assert(packet_make_uninitialized_packet(&packet, data_len) == 0);
   packet_make_partial(packet, PACKET_DATA, source_address, destination_address, 100, 200);
 
   uint8_t *data_ptr = (uint8_t *) &packet->checksum+1; // TODO make a function for this
@@ -85,7 +85,7 @@ main(int argc, char *argv[])
   */
   data_len = 1;
   packet_len = sizeof(struct PacketHeader)+data_len;
-  assert(packet_make_unitialized_packet(&packet, data_len) == 0);
+  assert(packet_make_uninitialized_packet(&packet, data_len) == 0);
   assert(packet_len == packet->total_length);
 
   uint8_t source_address_real[6] = { 0xdc, 0xa6, 0x32, 0xe8, 0xed, 0x86};

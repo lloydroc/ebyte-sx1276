@@ -108,6 +108,12 @@ parse_options(struct Options *opts, int argc, char *argv[])
     sprintf(opts->rundir, "/run/lorax");
     sprintf(opts->pidfile, "%s/echo.pid", opts->rundir);
 
+    if(opts->daemon)
+    {
+        use_syslog = 1;
+        openlog("lorax_echo", 0, LOG_DAEMON);
+    }
+
     return err || opts->help;
 }
 
@@ -121,18 +127,16 @@ int echo(struct Options *opts)
         return 1;
     }
 
-    info_output("received 0x");
+    info_output("received %d bytes from address %s\n", received_bytes, sock_source.sun_path);
     print_hex(buf, received_bytes);
-    info_output(" (%d) from address %s\n", received_bytes, sock_source.sun_path);
 
     if(socket_unix_send(opts->receive_fd, &sock_source, buf, received_bytes))
     {
         return 2;
     }
 
-    info_output("sent 0x");
+    info_output("sent %d bytes to address %s\n", received_bytes, sock_source.sun_path);
     print_hex(buf, received_bytes);
-    info_output(" (%d) to address %s\n", received_bytes, sock_source.sun_path);
 
     return 0;
 }

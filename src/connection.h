@@ -1,6 +1,7 @@
 #ifndef CONNECTION_H
 #define CONNECTION_H
 
+#include <sys/socket.h>
 #include "error.h"
 #include "message.h"
 #include "socket.h"

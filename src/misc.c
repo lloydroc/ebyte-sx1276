@@ -32,13 +32,25 @@ rfc8601_timespec(struct timespec *tv)
   return rfc8601;
 }
 
+/*
+ * Convert bytes the hex in a buffer and print them out.
+ * One byte is two hex chars so the buffer is double the size
+ * plus a byte for the null character.
+ */
 void
 print_hex(uint8_t *address, size_t len)
 {
-    debug_output("0x");
+    char *buf;
+
+    buf = malloc(len*2+1);
+    buf[len*2] = '\0';
     for(int i=0; i<len; i++)
-        debug_output("%02x", *(address+i));
-    debug_output(" %d\n", len);
+    {
+        sprintf(buf+i*2, "%02x", *(address+i));
+    }
+    debug_output("%s\n", buf);
+
+    free(buf);
 }
 
 int

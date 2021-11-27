@@ -9,6 +9,9 @@
 #include "misc.h"
 #include "socket.h"
 
+// TODO 1 need to allow to change the type of the message
+// TODO 2 we have a permission problem for /run/lorax/message where it doesn't have other write privs
+
 int use_syslog = 0;
 
 struct Options
@@ -43,7 +46,7 @@ print_usage(char *progname)
     const char *homedir;
 
     homedir = get_home_directory();
-    printf("Usage: %s [OPTIONS] type dest_addr dest_port message\n", progname);
+    printf("Usage: %s [OPTIONS] dest_addr dest_port message\n", progname);
     printf("Version: %s\n\n", VERSION);
     printf("A client to send reliable messages over LORA\n\n");
 
@@ -55,11 +58,11 @@ print_usage(char *progname)
     printf("OPTIONS:\n\
 -h, --help\n\
 -v, --verbose\n\
--t, --txsock [%s/client.messages] socket on the other end we'll send our message to\n\
--r, --rxsock [%s/messages] socket we will listen to for incoming messages\n\
+-t, --txsock [/run/lorax/messages] socket on the other end we'll send our message to\n\
+-r, --rxsock [%s/client.messages] socket we will listen to for incoming messages\n\
 -T, --timeout [30000] how long wait for a response on milliseconds\n\
 -s, --source-address TODO\n\
-    ", homedir, homedir);
+    ", homedir);
 }
 
 int
@@ -131,7 +134,7 @@ parse_options(struct Options *opts, int argc, char *argv[])
     if(!opts->txsock)
     {
         opts->txsock = malloc(strlen(homedir)+64);
-        sprintf(opts->txsock, "%s/messages", homedir);
+        sprintf(opts->txsock, "/run/lorax/messages");
     }
 
     if(!opts->rxsock)
@@ -214,8 +217,12 @@ int poll_loop(struct Options *opts)
             err_output("invalid message\n");
         }
         message = (struct Message *) buf;
-        info_output("message received: ");
         message_print(message);
+
+        memcpy(buf, message->data, message->data_length);
+        buf[message->data_length] = '\0';
+
+        info_output("Received message data: %s\n", buf);
     }
     else
     {
@@ -247,7 +254,7 @@ main(int argc, char *argv[])
     info_output("bound socket: %s\n", opts.rxsock);
     info_output("message:      %s\n", opts.message);
 
-    if(socket_open_unix(opts.txsock, &transmit_sock))
+    if(socket_create_unix(opts.txsock, &transmit_sock))
     {
         err_output("unable to open socket %s\n", opts.txsock);
     }
@@ -258,15 +265,14 @@ main(int argc, char *argv[])
         err = 2;
     }
 
-    message = message_make_unitialized_packet((uint8_t *)opts.message, strlen(opts.message));
+    message = message_make_uninitialized_packet((uint8_t *)opts.message, strlen(opts.message));
     message_make_partial(message, MESSAGE_TYPE_DATA, opts.source_address, opts.destination_address,
         opts.source_port, opts.destination_port);
 
     if(opts.verbose)
     {
-        info_output("message: ");
-        print_hex((uint8_t *)message, message_total_length(message));
-        info_output("");
+        message_print(message);
+        info_output("transmitting message: ");
     }
 
     if(socket_unix_send(opts.receive_fd, &transmit_sock, (uint8_t *)message, message_total_length(message)))

@@ -94,7 +94,7 @@ packet_get_data_size(struct PacketHeader *packet)
 }
 
 int
-packet_make_unitialized_packet(struct PacketHeader **header, uint8_t data_length)
+packet_make_uninitialized_packet(struct PacketHeader **header, uint8_t data_length)
 {
     uint8_t packet_bytes;
     packet_bytes = sizeof(struct PacketHeader)+data_length;
@@ -136,17 +136,25 @@ packet_make_partial(struct PacketHeader *packet, uint8_t type, uint8_t address_s
 void
 packet_print(struct PacketHeader *packet)
 {
-    debug_output("%02x ", packet->type);
+    char fmt[] = "packet: %02x %02x%02x%02x%02x%02x%02x:%02x -> %02x%02x%02x%02x%02x%02x:%02x %02x %02x\n";
 
-    for(int i=0; i<PACKET_ADDRESS_SIZE; i++)
-        debug_output("%02x", packet->source_address[i]);
-
-    debug_output(":%02x -> ", packet->source_port);
-
-    for(int i=0; i<PACKET_ADDRESS_SIZE; i++)
-        debug_output("%02x", packet->destination_address[i]);
-
-    debug_output(":%02x ", packet->destination_port);
-
-    debug_output("%02x %02x\n", packet->total_length, packet->checksum);
+    debug_output(fmt,
+        packet->type,
+        packet->source_address[0],
+        packet->source_address[1],
+        packet->source_address[2],
+        packet->source_address[3],
+        packet->source_address[4],
+        packet->source_address[5],
+        packet->source_port,
+        packet->destination_address[0],
+        packet->destination_address[1],
+        packet->destination_address[2],
+        packet->destination_address[3],
+        packet->destination_address[4],
+        packet->destination_address[5],
+        packet->destination_port,
+        packet->total_length,
+        packet->checksum
+    );
 }

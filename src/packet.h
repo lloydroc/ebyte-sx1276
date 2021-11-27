@@ -32,7 +32,7 @@ int
 packet_invalid(uint8_t *packet, size_t len);
 
 int
-packet_make_unitialized_packet(struct PacketHeader **header, uint8_t data_length);
+packet_make_uninitialized_packet(struct PacketHeader **header, uint8_t data_length);
 
 uint8_t *
 packet_get_data_pointer(struct PacketHeader *packet);

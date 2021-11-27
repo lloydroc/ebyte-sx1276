@@ -1,7 +1,7 @@
 #include "message.h"
 
 struct Message*
-message_make_unitialized_packet(uint8_t *data, uint8_t len)
+message_make_uninitialized_packet(uint8_t *data, uint8_t len)
 {
     struct Message *msg;
     msg = malloc(sizeof(struct Message)+len-1);
@@ -98,22 +98,25 @@ message_destroy(void *data)
 void
 message_print(struct Message *message)
 {
-    debug_output("%02x %02x ", message->retries, message->type);
+    char fmt[] = "message: %02x %02x %02x%02x%02x%02x%02x%02x:%02x -> %02x%02x%02x%02x%02x%02x:%02x %02x\n";
 
-    for(int i=0; i<MESSAGE_ADDRESS_SIZE; i++)
-        debug_output("%02x", message->source_address[i]);
-
-    debug_output(":%02x -> ", message->source_port);
-
-    for(int i=0; i<MESSAGE_ADDRESS_SIZE; i++)
-        debug_output("%02x", message->destination_address[i]);
-
-    debug_output(":%02x ", message->destination_port);
-
-    debug_output("%02x ", message->data_length);
-
-    for(int i=0; i<message->data_length; i++)
-        debug_output("%02x", message->data[i]);
-
-    debug_output("\n");
+    debug_output(fmt,
+        message->retries,
+        message->type,
+        message->source_address[0],
+        message->source_address[1],
+        message->source_address[2],
+        message->source_address[3],
+        message->source_address[4],
+        message->source_address[5],
+        message->source_port,
+        message->destination_address[0],
+        message->destination_address[1],
+        message->destination_address[2],
+        message->destination_address[3],
+        message->destination_address[4],
+        message->destination_address[5],
+        message->destination_port,
+        message->data_length
+    );
 }

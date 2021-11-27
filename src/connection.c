@@ -61,16 +61,26 @@ connection_destroy(void *data)
 void
 connection_print(struct Connection *connection)
 {
-    char *rfc8601;
+    char fmt[] = "%s %d %d -> %d %s\n";
+    char *rfc8601, *client_sock;
+
+    client_sock = malloc(sizeof(struct sockaddr_un));
 
     if(connection->client)
-        debug_output("%s ", connection->sock_client->sun_path);
-
-    debug_output("%d %d -> %d", connection->connection_state, connection->source_port, connection->destination_port);
+        strncpy(client_sock, connection->sock_client->sun_path, sizeof(struct sockaddr_un));
+    else
+        sprintf(client_sock, "client_socket_undefined");
 
     rfc8601 = rfc8601_timespec(&connection->state_time);
-    debug_output(" %s\n", rfc8601);
+    debug_output(fmt,
+        client_sock,
+        connection->connection_state,
+        connection->source_port,
+        connection->destination_port,
+        rfc8601
+    );
 
+    free(client_sock);
     free(rfc8601);
 }
 

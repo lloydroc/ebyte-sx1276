@@ -45,7 +45,7 @@ sendto:
 */
 
 int
-socket_open_unix(char *filename, struct sockaddr_un *sock);
+socket_create_unix(char *filename, struct sockaddr_un *sock);
 
 int
 socket_unix_bind(char *filename, int *fd, struct sockaddr_un *sock);

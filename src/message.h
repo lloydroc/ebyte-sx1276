@@ -23,7 +23,7 @@ struct Message
 };
 
 struct Message*
-message_make_unitialized_packet(uint8_t *data, uint8_t len);
+message_make_uninitialized_packet(uint8_t *data, uint8_t len);
 
 void
 message_make_partial(struct Message *message, uint8_t type, uint8_t address_source[], uint8_t address_destination[], uint8_t source_port, uint8_t destination_port);

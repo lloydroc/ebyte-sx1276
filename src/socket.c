@@ -1,8 +1,7 @@
 #include "socket.h"
 
-// FIXME rename this to socket_create_unix
 int
-socket_open_unix(char *filename, struct sockaddr_un *sock)
+socket_create_unix(char *filename, struct sockaddr_un *sock)
 {
   memset(sock, 0, sizeof(struct sockaddr_un));
   sock->sun_family = AF_UNIX;

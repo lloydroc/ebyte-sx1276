@@ -18,13 +18,18 @@ lorax_e32_init(struct OptionsLorax *opts)
     myself = malloc(sizeof(struct Neighbor));
     memset(myself, 0, sizeof(struct Neighbor));
     memcpy(myself->address, opts->mac_address, 6);
-    myself->type = opts->type;
 
     myself->connections = malloc(sizeof(struct List));
     list_init(myself->connections, connection_match, connection_destroy);
 
-    info_output("my source address ");
-    print_hex(myself->address, 6);
+    info_output("my source address: %02x%02x%02x%02x%02x%02x\n",
+        myself->address[0],
+        myself->address[1],
+        myself->address[2],
+        myself->address[3],
+        myself->address[4],
+        myself->address[5]
+    );
 
     return 0;
 }
@@ -90,7 +95,7 @@ lorax_send_broadcast_packet(struct OptionsLorax *opts)
     uint8_t *packet_data;
     uint8_t destination_broadcast[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
-    packet_make_unitialized_packet(&packet, 1);
+    packet_make_uninitialized_packet(&packet, 1);
     packet_make_partial(packet, PACKET_HEADER_BROADCAST, myself->address, destination_broadcast, 0, 0);
 
     packet_data = packet_get_data_pointer(packet);
@@ -152,9 +157,15 @@ lorax_neighbor_loop(struct OptionsLorax *opts)
        delta_seconds = now_time.tv_sec - neighbor->broadcast_time.tv_sec;
        if(delta_seconds > NEIGHBOR_STALE_SECONDS)
        {
-           info_output("not heard from neighbor for %d seconds, removing:", NEIGHBOR_STALE_SECONDS);
-           print_hex(neighbor->address, 6);
-           info_output("\n");
+            info_output("not heard from neighbor for %d seconds, removing: %02x%02x%02x%02x%02x%02x\n",
+                NEIGHBOR_STALE_SECONDS,
+                neighbor->address[0],
+                neighbor->address[1],
+                neighbor->address[2],
+                neighbor->address[3],
+                neighbor->address[4],
+                neighbor->address[5]
+            );
            list_iter_remove(&neighbors_iter);
            continue;
        }
@@ -364,7 +375,7 @@ lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *packet_bytes, size
     message = (struct Message *) malloc(len);
     memcpy(message, packet_bytes, len);
 
-    if(memcmp(sock_source, &opts->sock_server_data, sizeof(struct sockaddr_un)) == 0)
+    if(strncmp(sock_source->sun_path, (const char*) &opts->sock_server_data.sun_path, strnlen(sock_source->sun_path, sizeof(struct sockaddr_un))) == 0)
     {
         debug_output("message was received by server: swapping source and destination addresses\n");
         message_swap_source_dest(message);
@@ -517,7 +528,7 @@ lorax_e32_poll(struct OptionsLorax *opts)
             if(opts->verbose)
             {
                 debug_output("lorax_e32_poll: received message from %s ", sock_source.sun_path);
-                print_hex(message_rx_buf, received_bytes);
+                message_print((struct Message *) message_rx_buf);
             }
 
             if(lorax_e32_process_message(opts, message_rx_buf, received_bytes, &sock_source))

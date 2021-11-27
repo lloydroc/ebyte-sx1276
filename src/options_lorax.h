@@ -85,9 +85,13 @@ struct OptionsLorax
     bool verbose;
     bool help;
     bool daemon;
+    bool systemd;
+
+    char rundir[64];
+    char pidfile[64];
+
     char *iface_default;
     uint8_t mac_address[6];
-    int type; // TODO is this used?
 
     /* incoming messages from clients */
     int fd_socket_message_data;
@@ -109,8 +113,7 @@ struct OptionsLorax
 
     uint8_t num_retries;
 
-    /* unused */
-    //int fd_socket_e32_data;
+    /* TODO unused */
     struct sockaddr_un sock_e32_tx_ack;
     struct sockaddr_un sock_e32_data_rx;
     struct sockaddr_un sock_message_rx;
