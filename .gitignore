@@ -54,6 +54,7 @@ e32
 e32-*\.*\.\.
 lorax
 lorax_message
+lorax_control
 lorax_echo
 src/*.gdb
 *.log
@@ -67,5 +68,6 @@ test/test_misc
 test/test_options
 test/test_options_lorax
 test/test_packet
+test/test_control
 
 /e32-*.tar.gz

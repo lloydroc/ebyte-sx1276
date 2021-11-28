@@ -29,9 +29,14 @@ main(int argc, char *argv[])
         info_output("daemon started pid=%ld", getpid());
     }
 
+    if(opts.verbose)
+    {
+        options_lorax_print(&opts);
+    }
+
     if(opts.systemd)
     {
-        if(access(opts.rundir, F_OK ))
+        if(access(opts.rundir, F_OK))
         {
             if(mkdir(opts.rundir, S_IRUSR | S_IXUSR | S_IWUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH))
             {
@@ -44,11 +49,6 @@ main(int argc, char *argv[])
         {
             errno_output("unable to write pid file %s\n", opts.pidfile);
         }
-    }
-
-    if(opts.verbose)
-    {
-        options_lorax_print(&opts);
     }
 
     lorax_e32_init(&opts);

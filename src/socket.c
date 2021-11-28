@@ -7,7 +7,7 @@ socket_create_unix(char *filename, struct sockaddr_un *sock)
   sock->sun_family = AF_UNIX;
   strncpy(sock->sun_path, filename, sizeof(sock->sun_path)-1);
 
-  info_output("socket_open_unix: created socket filename=%s\n", sock->sun_path);
+  info_output("socket_create_unix: created socket filename=%s\n", sock->sun_path);
 
   return 0;
 }

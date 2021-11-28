@@ -5,6 +5,7 @@ struct List *neighbors;
 
 uint8_t e32_rx_buf[64];
 uint8_t message_rx_buf[64];
+uint8_t control_rx_buf[64];
 
 #define NEIGHBOR_STALE_SECONDS 60
 #define CONNECTION_RETRY_SECONDS 3
@@ -441,10 +442,63 @@ lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *packet_bytes, size
     return err;
 }
 
+/*
+    Process Control from clients.
+
+    For example the client may want to know what the neighborlist looks like.
+*/
+int
+lorax_e32_process_control(struct OptionsLorax *opts, uint8_t *control_bytes, size_t len, struct sockaddr_un *sock_source)
+{
+
+    int err;
+    uint8_t *control_response;
+    size_t control_response_len;
+
+    err = 0;
+
+    switch(control_bytes[0])
+    {
+        case CONTROL_REQUEST_GET_NEIGHBORS:
+            control_get_neighbors(neighbors, &control_response, &control_response_len);
+            break;
+        case CONTROL_REQUEST_GET_MY_ADDRESS:
+            control_get_my_address(myself->address, &control_response, &control_response_len);
+            break;
+        default:
+            control_response = malloc(1);
+            control_response_len = 1;
+            control_response[0] = CONTROL_RESPONSE_ERROR;
+            err = 1;
+            break;
+    }
+
+    if(socket_unix_send(opts->fd_socket_control, sock_source, control_response, control_response_len))
+    {
+        err_output("lorax_e32_process_control: unable to send %d bytes to socket %s\n", control_response_len, sock_source->sun_path);
+        err = 2;
+    }
+    else if (opts->verbose)
+    {
+        debug_output("lorax_e32_process_control: sent %d bytes to socket %s\n", control_response_len, sock_source->sun_path);
+    }
+
+    free(control_response);
+
+    return err;
+}
+
+int
+lorax_e32_send_control_error(struct OptionsLorax *opts, struct sockaddr_un *sock_source)
+{
+    uint8_t err = CONTROL_RESPONSE_ERROR;
+    return socket_unix_send(opts->fd_socket_control, sock_source, &err, 1);
+}
+
 int
 lorax_e32_poll(struct OptionsLorax *opts)
 {
-    struct pollfd pfd[2];
+    struct pollfd pfd[3];
 
     /* info from other sockets */
     struct sockaddr_un sock_source;
@@ -460,10 +514,12 @@ lorax_e32_poll(struct OptionsLorax *opts)
     pfd[0].events = POLLIN;
     pfd[1].fd = opts->fd_socket_message_data;
     pfd[1].events = POLLIN;
+    pfd[2].fd = opts->fd_socket_control;
+    pfd[2].events = POLLIN;
 
     for(;;)
     {
-        ret = poll(pfd, 2, opts->timeout_broadcast_ms);
+        ret = poll(pfd, 3, opts->timeout_broadcast_ms);
         if(ret == 0)
         {
             if(lorax_neighbor_loop(opts))
@@ -521,6 +577,7 @@ lorax_e32_poll(struct OptionsLorax *opts)
             ret = message_invalid(message_rx_buf, received_bytes);
             if(ret)
             {
+                // TODO send error
                 err_output("lorax_e32_poll: invalid message from %s of %d bytes got exit code %d ", sock_source.sun_path, received_bytes, ret);
                 continue;
             }
@@ -534,6 +591,30 @@ lorax_e32_poll(struct OptionsLorax *opts)
             if(lorax_e32_process_message(opts, message_rx_buf, received_bytes, &sock_source))
             {
                 err_output("lorax_e32_poll: unable to process message\n");
+                continue;
+            }
+        }
+
+        /* client control to query our neighbors and make changes to our internal structures */
+        if(pfd[2].revents & POLLIN)
+        {
+            if(socket_unix_receive(pfd[2].fd, control_rx_buf, sizeof(control_rx_buf), &received_bytes, &sock_source))
+            {
+                errno_output("lorax_e32_poll: error receiving from control socket\n");
+                return 1;
+            }
+
+            ret = control_request_invalid(control_rx_buf, received_bytes);
+            if(ret)
+            {
+                lorax_e32_send_control_error(opts, &sock_source);
+                err_output("lorax_e32_poll: invalid control from %s of %d bytes got exit code %d ", sock_source.sun_path, received_bytes, ret);
+                continue;
+            }
+
+            if(lorax_e32_process_control(opts, control_rx_buf, received_bytes, &sock_source))
+            {
+                err_output("lorax_e32_poll: unable to process control\n");
                 continue;
             }
         }

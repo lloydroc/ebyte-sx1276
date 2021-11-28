@@ -96,6 +96,9 @@ struct OptionsLorax
     /* incoming messages from clients */
     int fd_socket_message_data;
 
+    /* incoming control from clients */
+    int fd_socket_control;
+
     /* incoming data received from e32 over lora (registered) */
     int fd_socket_e32_data_client;
 
@@ -113,10 +116,11 @@ struct OptionsLorax
 
     uint8_t num_retries;
 
-    /* TODO unused */
+    /* TODO unused - use just use the file descriptor */
     struct sockaddr_un sock_e32_tx_ack;
     struct sockaddr_un sock_e32_data_rx;
     struct sockaddr_un sock_message_rx;
+    struct sockaddr_un sock_control_rx;
 
     int timeout_to_e32_socket_ms, timeout_from_e32_rx_ms, timeout_broadcast_ms;
 };

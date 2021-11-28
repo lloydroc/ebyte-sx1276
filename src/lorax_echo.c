@@ -167,7 +167,7 @@ main(int argc, char *argv[])
 
     if(opts.systemd)
     {
-        if(access(opts.rundir, F_OK ))
+        if(access(opts.rundir, F_OK))
         {
             if(mkdir(opts.rundir, S_IRUSR | S_IXUSR | S_IWUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH))
             {

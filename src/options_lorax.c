@@ -12,14 +12,15 @@ void options_lorax_usage(char *progname)
     printf("OPTIONS:\n\
     -h --help                  Print help\n\
     -v --verbose               Verbose Output\n\
-    -i --eth-iface             STRING Ethernet Interface to get mac address from. E.G. eth0\n\
+    -i, --eth-iface            STRING Ethernet Interface to get mac address from. E.G. eth0\n\
     -d, --daemon               become a daemon\n\
-        --systemd  create a pid file in the /run/lorax directory\n\
-    -m --sock-unix-messages    FILE Listening Socket for Client Messages\n\
-    -s --sock-unix-server      FILE Listening Socket for the server\n\
-    -a --sock-unix-e32-ack     FILE Listening Socket for e32 Acknowledements\n\
-    -c --sock-unix-e32-client  FILE Client Socket the e32 will send data to\n\
-    -e --sock-unix-e32-data    FILE Output Sensor Data to E32\n");
+        --systemd              create a pid file in the /run/lorax directory\n\
+    -m, --sock-unix-messages   FILE Listening Socket for Client Messages\n\
+    -r, --sock-unix-control    FILE Listening Socket for Control\n\
+    -s, --sock-unix-server     FILE Listening Socket for the server\n\
+    -a, --sock-unix-e32-ack    FILE Listening Socket for e32 Acknowledements\n\
+    -c, --sock-unix-e32-client FILE Client Socket the e32 will send data to\n\
+    -e, --sock-unix-e32-data   FILE Output Sensor Data to E32\n");
 }
 
 int
@@ -70,6 +71,7 @@ options_lorax_parse(struct OptionsLorax *opts, int argc, char *argv[])
         {"systemd",                   no_argument, 0, 0},
         {"eth-iface",                 required_argument, 0, 'i'},
         {"sock-unix-messages",        required_argument, 0, 'm'},
+        {"sock-unix-control",        required_argument, 0, 'r'},
         {"sock-unix-e32-ack",         required_argument, 0, 'a'},
         {"sock-unix-e32-client",      required_argument, 0, 'c'},
         {"sock-unix-e32-data",        required_argument, 0, 'e'},
@@ -80,7 +82,7 @@ options_lorax_parse(struct OptionsLorax *opts, int argc, char *argv[])
     while (1)
     {
         option_index = 0;
-        c = getopt_long(argc, argv, "hvdi:m:s:a:c:e:", long_options, &option_index);
+        c = getopt_long(argc, argv, "hvdi:m:r:s:a:c:e:", long_options, &option_index);
 
         if (c == -1)
             break;
@@ -103,6 +105,8 @@ options_lorax_parse(struct OptionsLorax *opts, int argc, char *argv[])
             }
             if(strcmp("sock-unix-messages", long_options[option_index].name) == 0)
                 err |= socket_unix_bind(optarg, &opts->fd_socket_message_data, &opts->sock_message_rx);
+            if(strcmp("sock-unix-control", long_options[option_index].name) == 0)
+                err |= socket_unix_bind(optarg, &opts->fd_socket_control, &opts->sock_control_rx);
             if(strcmp("sock-unix-server", long_options[option_index].name) == 0)
                 err |= socket_create_unix(optarg, &opts->sock_server_data);
             if(strcmp("sock-unix-e32-ack", long_options[option_index].name) == 0)
@@ -126,6 +130,9 @@ options_lorax_parse(struct OptionsLorax *opts, int argc, char *argv[])
             break;
         case 'm':
             err |= socket_unix_bind(optarg, &opts->fd_socket_message_data, &opts->sock_message_rx);
+            break;
+        case 'r':
+            err |= socket_unix_bind(optarg, &opts->fd_socket_control, &opts->sock_control_rx);
             break;
         case 's':
             err |= socket_create_unix(optarg, &opts->sock_server_data);
@@ -181,7 +188,8 @@ void options_lorax_print(struct OptionsLorax *opts)
     debug_output("option daemon is %d\n", opts->daemon);
 
     debug_output("option sock_message_rx is %s with fd %d\n", opts->sock_message_rx.sun_path, opts->fd_socket_message_data);
+    debug_output("option sock_control_rx is %s with fd %d\n", opts->sock_control_rx.sun_path, opts->fd_socket_control);
     debug_output("option sock_e32_tx_ack is %s with fd %d\n", opts->sock_e32_tx_ack.sun_path, opts->fd_socket_e32_ack_client);
-    debug_output("option sock_e32_data_rx is %s with fd %d\n", opts->sock_e32_data_rx.sun_path, opts->fd_socket_e32_ack_client);
+    debug_output("option sock_e32_data_rx is %s with fd %d\n", opts->sock_e32_data_rx.sun_path, opts->fd_socket_e32_data_client);
     debug_output("option sock_server_data is %s\n", opts->sock_server_data.sun_path);
 }

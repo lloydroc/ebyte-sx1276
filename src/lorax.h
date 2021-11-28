@@ -16,6 +16,7 @@
 #include "connection.h"
 #include "message.h"
 #include "convert.h"
+#include "control.h"
 
 int
 lorax_e32_init(struct OptionsLorax *opts);
