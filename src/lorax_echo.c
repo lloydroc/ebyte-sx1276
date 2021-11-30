@@ -159,7 +159,7 @@ main(int argc, char *argv[])
         err = become_daemon();
         if(err)
         {
-            err_output("lorax: error becoming daemon: %d\n", err);
+            err_output("main: error becoming daemon: %d\n", err);
             return 2;
         }
         info_output("daemon started pid=%ld", getpid());

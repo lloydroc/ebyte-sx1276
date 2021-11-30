@@ -7,8 +7,6 @@ socket_create_unix(char *filename, struct sockaddr_un *sock)
   sock->sun_family = AF_UNIX;
   strncpy(sock->sun_path, filename, sizeof(sock->sun_path)-1);
 
-  info_output("socket_create_unix: created socket filename=%s\n", sock->sun_path);
-
   return 0;
 }
 
@@ -16,6 +14,20 @@ int
 socket_unix_bind(char *filename, int *fd, struct sockaddr_un *sock)
 {
   char path[1024];
+  char *sockdir;
+
+  sockdir = strdup(filename);
+  sockdir = dirname(sockdir);
+
+  if(access(sockdir, F_OK))
+  {
+      if(mkdir(sockdir, S_IRUSR | S_IXUSR | S_IWUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH))
+      {
+          errno_output("creating directory %s\n", sockdir);
+      }
+  }
+
+  free(sockdir);
 
   memset(sock, 0, sizeof(struct sockaddr_un));
   sock->sun_family = AF_UNIX;
@@ -23,19 +35,19 @@ socket_unix_bind(char *filename, int *fd, struct sockaddr_un *sock)
   *fd = socket(AF_UNIX, SOCK_DGRAM, 0);
   if(*fd == -1)
   {
-    errno_output("socket_create_unix: error opening socket\n");
+    errno_output("socket_unix_bind: error opening socket\n");
     return 1;
   }
 
   if(strlen(filename) > sizeof(sock->sun_path)-1)
   {
-    err_output("socket_create_unix: socket path too long must be %d chars\n", sizeof(sock->sun_path)-1);
+    err_output("socket_unix_bind: socket path too long must be %d chars\n", sizeof(sock->sun_path)-1);
     return 3;
   }
 
   if(remove(filename) == -1 && errno != ENOENT)
   {
-    errno_output("socket_create_unix: error removing socket\n");
+    errno_output("socket_unix_bind: error removing socket\n");
     return 4;
   }
 
@@ -43,7 +55,7 @@ socket_unix_bind(char *filename, int *fd, struct sockaddr_un *sock)
 
   if(bind(*fd, (struct sockaddr*) sock, sizeof(struct sockaddr_un)) == -1)
   {
-    errno_output("socket_create_unix: error binding to socket\n");
+    errno_output("socket_unix_bind: error binding to socket %s\n", filename);
     return 5;
   }
 
@@ -55,8 +67,6 @@ socket_unix_bind(char *filename, int *fd, struct sockaddr_un *sock)
 
   /* update the socket path so the the destination sockets have the full path */
   strncpy(sock->sun_path, path, sizeof(sock->sun_path)-1);
-
-  info_output("socket_create_unix: binding socket fd=%d filename=%s\n", *fd, sock->sun_path);
 
   return 0;
 }

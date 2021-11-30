@@ -2,11 +2,14 @@
 #define SOCKET_H
 
 #include "config.h"
+#include <libgen.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <unistd.h>
 #include "error.h"
 
 /*
