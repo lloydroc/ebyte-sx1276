@@ -23,6 +23,7 @@ struct Options
   char *rxsock;
   int receive_fd;
   int timeout_ms;
+  int retries;
   uint8_t source_address[6];
   uint8_t destination_address[6];
   uint8_t source_port;
@@ -58,11 +59,11 @@ print_usage(char *progname)
     printf("OPTIONS:\n\
 -h, --help\n\
 -v, --verbose\n\
--t, --txsock [/run/lorax/messages] socket on the other end we'll send our message to\n\
--r, --rxsock [%s/client.messages] socket we will listen to for incoming messages\n\
+-t, --txsock [/run/lorax/messages] destination socket we'll send the message to\n\
+-r, --rxsock [%s/client.messages] source socket we will listen for a response\n\
+-R, --retries [1] number of times to retry if the message fails\n\
 -T, --timeout [30000] how long wait for a response on milliseconds\n\
--s, --source-address TODO\n\
-    ", homedir);
+-s, --source-address TODO\n\n", homedir);
 }
 
 int
@@ -77,6 +78,7 @@ parse_options(struct Options *opts, int argc, char *argv[])
 
     err = 0;
     opts->timeout_ms = 30000;
+    opts->retries = 1;
 
     static struct option long_options[] =
     {
@@ -84,6 +86,7 @@ parse_options(struct Options *opts, int argc, char *argv[])
         {"verbose",                  no_argument, 0, 'v'},
         {"txsock",             required_argument, 0, 't'},
         {"rxsock",             required_argument, 0, 'r'},
+        {"retries",            required_argument, 0, 'R'},
         {"timeout",            required_argument, 0, 'T'},
         {"source-address",     required_argument, 0, 's'}, // TODO
         {0,                                    0, 0,   0}
@@ -92,7 +95,7 @@ parse_options(struct Options *opts, int argc, char *argv[])
     while(1)
     {
         option_index = 0;
-        c = getopt_long(argc, argv, "hvt:r:T:", long_options, &option_index);
+        c = getopt_long(argc, argv, "hvt:r:R:T:", long_options, &option_index);
 
         if(c == -1)
             break;
@@ -110,6 +113,8 @@ parse_options(struct Options *opts, int argc, char *argv[])
                 opts->rxsock = optarg;
             else if(strcmp("timeout", long_options[option_index].name) == 0)
                 opts->timeout_ms = atoi(optarg);
+            else if(strcmp("retries", long_options[option_index].name) == 0)
+                opts->retries = atoi(optarg);
             break;
         case 'h':
             opts->help = 1;
@@ -122,6 +127,9 @@ parse_options(struct Options *opts, int argc, char *argv[])
             break;
         case 'r':
             opts->rxsock = optarg;
+            break;
+        case 'R':
+            opts->retries = atoi(optarg);
             break;
         }
     }
@@ -268,6 +276,7 @@ main(int argc, char *argv[])
     message = message_make_uninitialized_packet((uint8_t *)opts.message, strlen(opts.message));
     message_make_partial(message, MESSAGE_TYPE_DATA, opts.source_address, opts.destination_address,
         opts.source_port, opts.destination_port);
+    message->retries = opts.retries;
 
     if(opts.verbose)
     {

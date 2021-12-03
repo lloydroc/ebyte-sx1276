@@ -5,19 +5,19 @@ test_list_CFLAGS = -I$(top_srcdir)/src
 test_list_LDADD = ../src/list.o
 
 test_packet_CFLAGS = -I$(top_srcdir)/src
-test_packet_LDADD = ../src/packet.o ../src/message.o ../src/convert.o ../src/error.o ../src/misc.o -lm
+test_packet_LDADD = ../src/packet.o ../src/message.o ../src/convert.o ../src/error.o ../src/misc.o
 
 test_message_CFLAGS = -I$(top_srcdir)/src
-test_message_LDADD = ../src/packet.o ../src/message.o ../src/convert.o ../src/error.o ../src/misc.o -lm
+test_message_LDADD = ../src/packet.o ../src/message.o ../src/convert.o ../src/error.o ../src/misc.o
 
 test_options_lorax_CFLAGS = -I$(top_srcdir)/src
-test_options_lorax_LDADD = ../src/options_lorax.o ../src/error.o ../src/socket.o ../src/misc.o -lm
+test_options_lorax_LDADD = ../src/options_lorax.o ../src/error.o ../src/socket.o ../src/misc.o
 
 test_misc_CFLAGS = -I$(top_srcdir)/src
-test_misc_LDADD = ../src/misc.o ../src/error.o -lm
+test_misc_LDADD = ../src/misc.o ../src/error.o
 
 test_control_CFLAGS = -I$(top_srcdir)/src
-test_control_LDADD = ../src/error.o ../src/control.o ../src/list.o ../src/neighbor.o ../src/connection.o ../src/misc.o -lm
+test_control_LDADD = ../src/error.o ../src/control.o ../src/list.o ../src/neighbor.o ../src/connection.o ../src/misc.o
 
 check_PROGRAMS = test_options test_options_lorax test_list test_packet test_message test_misc test_control
 test_options_SOURCES = test_options.c $(top_builddir)/src/options.h $(top_builddir)/src/error.h $(top_builddir)/src/socket.h

@@ -61,7 +61,7 @@ connection_destroy(void *data)
 void
 connection_print(struct Connection *connection)
 {
-    char fmt[] = "%s %d %d -> %d %s\n";
+    char fmt[] = "%s %d %d %d -> %d %s\n";
     char *rfc8601, *client_sock;
 
     client_sock = malloc(sizeof(struct sockaddr_un));
@@ -74,6 +74,7 @@ connection_print(struct Connection *connection)
     rfc8601 = rfc8601_timespec(&connection->state_time);
     debug_output(fmt,
         client_sock,
+        list_size(connection->messages),
         connection->connection_state,
         connection->source_port,
         connection->destination_port,

@@ -187,14 +187,14 @@ int poll_loop(struct Options *opts)
         }
         else if(bytes_received > 2 && buf[0] == CONTROL_RESPONSE_OK && buf[1] == CONTROL_REQUEST_GET_NEIGHBORS)
         {
-            for(int i=3;i<buf[1]+3;i++)
+            for(int i=0;i<buf[2];i++)
                 info_output("%02x%02x%02x%02x%02x%02x\n",
-                    buf[i],
-                    buf[i+1],
-                    buf[i+2],
-                    buf[i+3],
-                    buf[i+4],
-                    buf[i+5]
+                    buf[i*6+3+0],
+                    buf[i*6+3+1],
+                    buf[i*6+3+2],
+                    buf[i*6+3+3],
+                    buf[i*6+3+4],
+                    buf[i*6+3+5]
                 );
         }
         else if(bytes_received > 2 && buf[0] == CONTROL_RESPONSE_OK && buf[1] == CONTROL_REQUEST_GET_MY_ADDRESS)
@@ -261,7 +261,8 @@ main(int argc, char *argv[])
     }
     else
     {
-        control_buf_len = 0;
+        err_output("invalid command %s\n", command);
+        return 2;
     }
 
     if(socket_create_unix(opts.txsock, &transmit_sock))

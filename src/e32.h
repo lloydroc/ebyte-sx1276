@@ -9,6 +9,7 @@
 #include "gpio.h"
 #include "uart.h"
 #include "list.h"
+#include "misc.h"
 
 /*
  The e32 has a TX buffer of 512 bytes but how it's implemented

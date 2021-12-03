@@ -20,7 +20,6 @@ rfc8601_timespec(struct timespec *tv)
   // do the math to convert nanoseconds to integer milliseconds
   fractional_seconds = (double) tv->tv_nsec;
   fractional_seconds /= 1e6;
-  fractional_seconds = round(fractional_seconds);
   milliseconds = (int) fractional_seconds;
 
   // print date and time withouth milliseconds
@@ -94,4 +93,21 @@ parse_mac_address(const char *address, uint8_t hex_address[])
   }
 
   return 0;
+}
+
+int
+get_random_timeout(int num_neighbors)
+{
+  int slot, num_slots;
+  int timeout_random_ms;
+
+  if(num_neighbors < 2)
+  {
+    num_neighbors = 3;
+  }
+
+  num_slots = num_neighbors*3;
+  slot = rand() % num_slots;
+  timeout_random_ms = slot*100;
+  return timeout_random_ms;
 }

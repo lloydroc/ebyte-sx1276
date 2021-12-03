@@ -71,7 +71,7 @@ options_lorax_parse(struct OptionsLorax *opts, int argc, char *argv[])
         {"systemd",                   no_argument, 0, 0},
         {"eth-iface",                 required_argument, 0, 'i'},
         {"sock-unix-messages",        required_argument, 0, 'm'},
-        {"sock-unix-control",        required_argument, 0, 'r'},
+        {"sock-unix-control",         required_argument, 0, 'r'},
         {"sock-unix-e32-ack",         required_argument, 0, 'a'},
         {"sock-unix-e32-client",      required_argument, 0, 'c'},
         {"sock-unix-e32-data",        required_argument, 0, 'e'},
