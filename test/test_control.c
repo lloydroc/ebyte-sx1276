@@ -32,6 +32,7 @@ test_control_neighborlist()
     assert(neighbor_buffer[0] == CONTROL_RESPONSE_OK);
     assert(neighbor_buffer[1] == CONTROL_REQUEST_GET_NEIGHBORS);
     assert(neighbor_buffer[2] == 0);
+    free(neighbor_buffer);
 
     list_add_first(&neighborlist, neighbor3);
     list_add_first(&neighborlist, neighbor2);
