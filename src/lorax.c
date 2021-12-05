@@ -7,7 +7,7 @@ uint8_t e32_rx_buf[64];
 uint8_t message_rx_buf[64];
 uint8_t control_rx_buf[64];
 
-#define NEIGHBOR_STALE_SECONDS 60
+#define NEIGHBOR_STALE_SECONDS 120
 #define CONNECTION_RETRY_SECONDS 3
 
 int
@@ -58,6 +58,25 @@ lorax_e32_register(struct OptionsLorax *opts)
     }
 
     return 0;
+}
+
+static int
+lorax_send_message_invalid(struct OptionsLorax *opts, struct sockaddr_un *sock_dest, uint8_t destination_address[], uint8_t destination_port, int error_type)
+{
+    struct Message *message;
+    size_t message_len;
+
+    message = message_make_uninitialized_packet(NULL, 0);
+    message_make_partial(message, error_type, myself->address, destination_address, 0, destination_port);
+    message_len = message_total_length(message);
+
+    if(opts->verbose)
+    {
+        debug_output("lorax_send_message_invalid: %s ", sock_dest->sun_path);
+        message_print(message);
+    }
+
+    return socket_unix_send(opts->fd_socket_message_data, sock_dest, (uint8_t *) message, message_len);
 }
 
 static int
@@ -522,6 +541,8 @@ lorax_e32_poll(struct OptionsLorax *opts)
 {
     int ret;
     struct pollfd pfd[3];
+    struct PacketHeader *received_packet;
+    struct Message *received_message;
 
     /* info from other sockets */
     struct sockaddr_un sock_source;
@@ -585,10 +606,12 @@ lorax_e32_poll(struct OptionsLorax *opts)
                 continue;
             }
 
+            received_packet = (struct PacketHeader *) received_bytes;
+
             if(opts->verbose)
             {
                 debug_output("lorax_e32_poll: received packet ");
-                packet_print((struct PacketHeader *) e32_rx_buf);
+                packet_print(received_packet);
             }
 
             if(lorax_e32_process_packet(opts, e32_rx_buf, received_bytes))
@@ -614,6 +637,14 @@ lorax_e32_poll(struct OptionsLorax *opts)
             {
                 // TODO send error
                 err_output("lorax_e32_poll: invalid message from %s of %d bytes got exit code %d ", sock_source.sun_path, received_bytes, ret);
+                continue;
+            }
+
+            received_message = (struct Message*) message_rx_buf;
+            if(received_message->data_length > MESSAGE_MAX_DATA_LEN)
+            {
+                err_output("lorax_e32_poll: message too large. data > %d\n", MESSAGE_MAX_DATA_LEN);
+                lorax_send_message_invalid(opts, &sock_source, received_message->source_address, received_message->source_port, MESSAGE_TYPE_TOO_LARGE);
                 continue;
             }
 

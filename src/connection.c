@@ -34,11 +34,11 @@ connection_match(void *p1, void *p2)
     c1 = (struct Connection *) p1;
     c2 = (struct Connection *) p2;
 
-    t1 = c1->source_port - c2->source_port;
+    t1 = c1->source_port != c2->source_port;
     if(t1)
         return t1;
 
-    t2 = c1->destination_port - c2->destination_port;
+    t2 = c1->destination_port != c2->destination_port;
     if(t2)
         return t2;
 

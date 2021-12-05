@@ -35,15 +35,15 @@
     v
     6
 
-1 we listen for data
-2 we send back to client
-3 send data to e32 for tx
+1 we listen for "messages"
+2 we send back to client or a server
+3 send "packets" to e32 for tx
 4 and acknowledgement data was sent from 3
 5 a registered socket with e32 for rx data
 6 the uart file to send to the e32 module
 
 1 sock_message_rx bind recvfrom
-2 not in options but saved when sensor data sent
+2 not in options but saved when client or server sends a message
 3 socket_unix_e32_data open sendto
 4 sock_e32_tx_ack bind recvfrom
 5 sock_e32_data_rx bind recvfrom
@@ -67,16 +67,10 @@ receive a packet:
     sockfd e32_data_client (registered)
     source e32_data
 
-what about the file descriptors?
- e32_data_client and e32_ack_client are used for recvfrom and sendto
- sensor_data is polled
-
-seems source_sock isn't used and dest_fd isn't used
-
  pairs (source, dest)
-   (e32_data_client, e32_data) -> will receive data from e32
-   (e32_ack_client, e32_data)  -> will send data to the e32
-   (sensor_data, x)            -> will receive data from client
+   (e32_data_client, e32_data) -> will receive packets from e32
+   (e32_ack_client, e32_data)  -> will send packets to the e32
+   (messages_rx, x)            -> will receive messages from client
 
 */
 

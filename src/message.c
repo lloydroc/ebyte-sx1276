@@ -47,7 +47,11 @@ message_invalid(uint8_t *message, size_t len)
     return 0;
 }
 
-/* compare everything except retries and type */
+/*
+ * Compare members except retries and type. We'll
+ * set members we don't want to compare to temp values,
+ * set them to zero, compare, then set them back.
+ */
 int
 message_match(void *m1, void *m2)
 {

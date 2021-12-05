@@ -43,8 +43,7 @@ main(int argc, char *argv[])
                 errno_output("creating directory %s\n", opts.rundir);
             }
         }
-        // FIXME
-        //chmod("/run/lorax/messages", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+
         if(write_pidfile(opts.pidfile))
         {
             errno_output("unable to write pid file %s\n", opts.pidfile);

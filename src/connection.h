@@ -8,6 +8,20 @@
 #include "list.h"
 #include "misc.h"
 
+/* A connection can be in two states:
+   1) waiting for a message
+   2) waiting for a packet
+   For example we create a new connection by receiving a
+   message to a neighbor. We will convert the message to
+   a packet and then send it off. We'll put this connection
+   in the waiting packet state since we're waiting on a packet
+   back from the destination.
+   On the other end if we receive a packet that with the destination
+   that matches our lorax we will send this packet to the server socket
+   and wait to hear back. Thus, we'd be waiting for a message back from
+   the server. Once we hear back from the server we'll put the connection
+   back in the state of waiting for a packet.
+   */
 enum STATE_CONNECTION
 {
     STATE_WAITING_MESSAGE,
@@ -16,7 +30,8 @@ enum STATE_CONNECTION
 
 /*
 A connection holds the source and destination address and port.
-This structure is initiated by a client to a server.
+We create a connection when a message is sent to a neighbor, or,
+a packet with the destination address of our lorax.
 When created we will set the source to ourselves and the destination
 to the other end. However, when looking up a connection from a
 received packet we need to swap the source and destination as we

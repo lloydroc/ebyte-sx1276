@@ -7,8 +7,11 @@
 #include "error.h"
 
 #define MESSAGE_ADDRESS_SIZE 6
+#define MESSAGE_MAX_DATA_LEN 58
+
 #define MESSAGE_TYPE_UNREACHABLE 0
 #define MESSAGE_TYPE_DATA 1
+#define MESSAGE_TYPE_TOO_LARGE 2
 
 struct Message
 {
@@ -18,7 +21,7 @@ struct Message
     uint8_t destination_address[MESSAGE_ADDRESS_SIZE];
     uint8_t source_port;
     uint8_t destination_port;
-    uint8_t data_length; // TODO rename to data length
+    uint8_t data_length;
     uint8_t data[];
 };
 

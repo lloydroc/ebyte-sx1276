@@ -445,26 +445,11 @@ int list_iter_remove(struct ListIterator *iterator)
 
   iterator->current = iterator->next;
 
-  /*if(iterator->previous == NULL)
-  {
-    iterator->current = iterator->list->first;
-  }
-  else
-  {
-    iterator->current = iterator->previous;
-  }*/
-
   if(iterator->current)
     iterator->next = iterator->current->next;
 
   if(iterator->previous)
     iterator->previous->next = iterator->current;
-
-  /*iterator->previous = NULL;
-  iterator->current = iterator->next;
-
-  if(iterator->next)
-    iterator->next = iterator->current->next;*/
 
   iterator->skip_next = true;
   iterator->list->size--;
