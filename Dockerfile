@@ -1,6 +1,6 @@
 FROM ubuntu:20.04 AS build
 
-ARG VERSION=1.10.0
+ARG VERSION=1.10.1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -19,3 +19,4 @@ FROM ubuntu:20.04
 COPY --from=build /usr/local/bin/e32 /usr/local/bin/e32
 
 ENTRYPOINT [ "/usr/local/bin/e32" ]
+

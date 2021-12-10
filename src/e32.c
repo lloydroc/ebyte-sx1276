@@ -808,10 +808,13 @@ e32_poll_init(struct E32 *dev, struct options *opts, struct pollfd pfd[])
     dev->isatty = 1;
     info_output("waiting for input from the terminal\n");
   }
-  else {
+  else
+  {
     opts->input_standard = 0;
+    info_output("disabled standard input\n");
   }
-    // used for stdin or a pipe
+
+  // used for stdin or a pipe
   pfd[PFD_STDIN].fd = -1;
   pfd[PFD_STDIN].events = 0;
 
