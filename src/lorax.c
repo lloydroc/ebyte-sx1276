@@ -38,7 +38,6 @@ lorax_e32_init(struct OptionsLorax *opts)
 int
 lorax_e32_destroy()
 {
-    // FIXME destroy connections
     list_destroy(neighbors);
     free(neighbors);
     free(myself);
@@ -66,7 +65,7 @@ lorax_send_message_invalid(struct OptionsLorax *opts, struct sockaddr_un *sock_d
     struct Message *message;
     size_t message_len;
 
-    message = message_make_uninitialized_packet(NULL, 0);
+    message = message_make_uninitialized_message(NULL, 0);
     message_make_partial(message, error_type, myself->address, destination_address, 0, destination_port);
     message_len = message_total_length(message);
 
@@ -226,7 +225,6 @@ lorax_neighbor_loop(struct OptionsLorax *opts)
                 else
                 {
                     // exhausted retries send message to client
-                    // FIXME need to remove the message
                     message->type = MESSAGE_TYPE_UNREACHABLE;
                     if(socket_unix_send(opts->fd_socket_message_data, connection->sock_client, (uint8_t *) message, message_total_length(message)))
                     {
@@ -316,9 +314,7 @@ lorax_e32_process_packet(struct OptionsLorax *opts, uint8_t *packet, size_t len)
     int err;
 
     err = 0;
-    packet_received = malloc(len);
-    memcpy(packet_received, packet, len);
-    //packet_received = (struct PacketHeader*) packet;
+    packet_received = (struct PacketHeader *) packet;
 
     if(packet_received->type == PACKET_HEADER_BROADCAST)
     {
@@ -346,7 +342,7 @@ lorax_e32_process_packet(struct OptionsLorax *opts, uint8_t *packet, size_t len)
     {
         connection = connection_make_uninitialzed(STATE_WAITING_PACKET, packet_received->destination_port, packet_received->source_port, message_match, message_destroy);
         list_add_first(neighbor->connections, connection);
-        debug_output("lorax_e32_process_packet: new connection");
+        debug_output("lorax_e32_process_packet: new connection\n");
         connection_print(connection);
     }
 
@@ -359,7 +355,7 @@ lorax_e32_process_packet(struct OptionsLorax *opts, uint8_t *packet, size_t len)
         sock_dest = &opts->sock_server_data;
     }
 
-    if(sock_dest == NULL || strlen(sock_dest->sun_path) == 0)
+    if(sock_dest == NULL || strnlen(sock_dest->sun_path, sizeof(struct sockaddr_un)) == 0)
         warn_output("no server socket specified");
 
     packet_to_message(packet_received, &message);
@@ -370,11 +366,11 @@ lorax_e32_process_packet(struct OptionsLorax *opts, uint8_t *packet, size_t len)
         packet_swap_source_dest(packet_received);
         packet_received->type = PACKET_ERROR_SERVER;
         packet_compute_checksum(packet_received, packet_received->total_length);
-        if(lorax_send_packet(opts, (uint8_t *)packet_received, packet_received->total_length))
+        if(lorax_send_packet(opts, packet, packet_received->total_length))
         {
             list_remove_first(neighbor->connections);
+            err_output("lorax_e32_process_packet: unable to send packet responding with PACKET_ERROR_SERVER\n");
             err = 2;
-            err_output("unable to send PACKET_ERROR_SERVER packet\n");
         }
     }
 
@@ -386,7 +382,7 @@ lorax_e32_process_packet(struct OptionsLorax *opts, uint8_t *packet, size_t len)
         list_remove_first(connection->messages);
 
     free(message);
-    free(packet_received);
+
     return err;
 }
 
@@ -402,17 +398,14 @@ lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *packet_bytes, size
 {
 
     int err;
-    struct Message *message;
+    struct Message *message, *message_copy;
     struct PacketHeader *packet_to_send;
     struct Neighbor *neighbor, neighbor_lookup;
     struct Connection *connection;
 
     err = 0;
-    packet_to_send = NULL;
 
-    // we malloc since the message is added to the connection's list of messages
-    message = (struct Message *) malloc(len);
-    memcpy(message, packet_bytes, len);
+    message = (struct Message *) packet_bytes;
 
     if(strncmp(sock_source->sun_path, (const char*) &opts->sock_server_data.sun_path, strnlen(sock_source->sun_path, sizeof(struct sockaddr_un))) == 0)
     {
@@ -462,10 +455,11 @@ lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *packet_bytes, size
     clock_gettime(CLOCK_REALTIME, &connection->state_time);
 
     /* only add the message for retries if client and not the server */
-    // TODO compare sockets can be better
-    if(strncmp(sock_source->sun_path, opts->sock_server_data.sun_path, sizeof(struct sockaddr_un)))
+    if(strncmp(sock_source->sun_path, opts->sock_server_data.sun_path, strlen(sock_source->sun_path)))
     {
-        list_add_last(connection->messages, message);
+        message_copy = malloc(message_total_length(message));
+        memcpy(message_copy, message, message_total_length(message));
+        list_add_last(connection->messages, message_copy);
     }
 
     // convert the message to a packet
@@ -606,11 +600,11 @@ lorax_e32_poll(struct OptionsLorax *opts)
                 continue;
             }
 
-            received_packet = (struct PacketHeader *) received_bytes;
+            received_packet = (struct PacketHeader *) e32_rx_buf;
 
             if(opts->verbose)
             {
-                debug_output("lorax_e32_poll: received packet ");
+                debug_output("lorax_e32_poll: received ");
                 packet_print(received_packet);
             }
 

@@ -100,7 +100,10 @@ packet_make_uninitialized_packet(struct PacketHeader **header, uint8_t data_leng
     packet_bytes = sizeof(struct PacketHeader)+data_length;
     *header = malloc(packet_bytes);
     if(*header == NULL)
+    {
+        errno_output("packet_make_uninitialized_packet: unable to allocate memory\n");
         return 1;
+    }
 
     memset(*header, 0, packet_bytes);
     (*header)->total_length = packet_bytes;

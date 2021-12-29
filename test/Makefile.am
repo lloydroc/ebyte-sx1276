@@ -19,7 +19,10 @@ test_misc_LDADD = ../src/misc.o ../src/error.o
 test_control_CFLAGS = -I$(top_srcdir)/src
 test_control_LDADD = ../src/error.o ../src/control.o ../src/list.o ../src/neighbor.o ../src/connection.o ../src/misc.o
 
-check_PROGRAMS = test_options test_options_lorax test_list test_packet test_message test_misc test_control
+test_convert_CFLAGS = -I$(top_srcdir)/src
+test_convert_LDADD = ../src/error.o ../src/convert.o ../src/list.o ../src/connection.o ../src/misc.o ../src/packet.o ../src/message.o
+
+check_PROGRAMS = test_options test_options_lorax test_list test_packet test_message test_misc test_control test_convert
 test_options_SOURCES = test_options.c $(top_builddir)/src/options.h $(top_builddir)/src/error.h $(top_builddir)/src/socket.h
 test_options_lorax_SOURCES = test_options_lorax.c $(top_builddir)/src/options_lorax.h $(top_builddir)/src/error.h $(top_builddir)/src/socket.h $(top_builddir)/src/misc.h
 test_list_SOURCES = test_list.c $(top_builddir)/src/list.h
@@ -27,4 +30,6 @@ test_packet_SOURCES = test_packet.c $(top_builddir)/src/packet.h $(top_builddir)
 test_message_SOURCES = test_message.c $(top_builddir)/src/message.h $(top_builddir)/src/packet.h $(top_builddir)/src/convert.h $(top_builddir)/src/error.h $(top_builddir)/src/misc.h
 test_misc = test_misc.c $(top_builddir)/src/misc.h $(top_builddir)/src/error.h
 test_control = test_control.c $(top_builddir)/src/error.h $(top_builddir)/src/control.h $(top_builddir)/src/list.h $(top_builddir)/src/neighbor.h $(top_builddir)/src/connection.h $(top_builddir)/src/misc.h
+test_convert = test_convert.c $(top_builddir)/src/error.h $(top_builddir)/src/convert.h $(top_builddir)/src/list.h $(top_builddir)/src/message.h $(top_builddir)/src/packet.h $(top_builddir)/src/misc.h
+
 TESTS = $(check_PROGRAMS)

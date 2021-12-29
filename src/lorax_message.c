@@ -176,12 +176,6 @@ parse_options(struct Options *opts, int argc, char *argv[])
         }
 
         opts->message = argv[argc-1];
-
-        /*while (optind < argc)
-        {
-
-            opts->message = argv[optind++];
-        }*/
     }
 
     return err || opts->help;
@@ -204,7 +198,7 @@ int poll_loop(struct Options *opts)
     ret = poll(pfd, 1, opts->timeout_ms);
     if(ret == 0)
     {
-        err_output("timed out waiting for connection\n");
+        err_output("timed out waiting for response\n");
         err = 1;
     }
     else if(ret < 0)
@@ -273,7 +267,7 @@ main(int argc, char *argv[])
         err = 2;
     }
 
-    message = message_make_uninitialized_packet((uint8_t *)opts.message, strlen(opts.message));
+    message = message_make_uninitialized_message((uint8_t *) opts.message, strlen(opts.message));
     message_make_partial(message, MESSAGE_TYPE_DATA, opts.source_address, opts.destination_address,
         opts.source_port, opts.destination_port);
     message->retries = opts.retries;
@@ -287,6 +281,8 @@ main(int argc, char *argv[])
     if(socket_unix_send(opts.receive_fd, &transmit_sock, (uint8_t *)message, message_total_length(message)))
     {
         err_output("unable to transmit message\n");
+        err = 3;
+        goto cleanup;
     }
 
     err = poll_loop(&opts);
@@ -301,6 +297,7 @@ main(int argc, char *argv[])
         warn_output("unable to remove socket %s\n", opts.rxsock);
     }
 
+cleanup:
     free(message);
 
     return err;

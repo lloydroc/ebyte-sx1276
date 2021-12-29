@@ -1,10 +1,10 @@
 #include "message.h"
 
 struct Message*
-message_make_uninitialized_packet(uint8_t *data, uint8_t len)
+message_make_uninitialized_message(uint8_t *data, uint8_t len)
 {
     struct Message *msg;
-    msg = malloc(sizeof(struct Message)+len-1);
+    msg = malloc(sizeof(struct Message)+len);
     memcpy(msg->data, data, len);
     msg->data_length = len;
     msg->retries = 1;

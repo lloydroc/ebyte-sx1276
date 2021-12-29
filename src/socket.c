@@ -1,5 +1,7 @@
 #include "socket.h"
 
+#define PERMS_FULL S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH |  S_IWOTH | S_IXOTH
+
 int
 socket_create_unix(char *filename, struct sockaddr_un *sock)
 {
@@ -21,7 +23,7 @@ socket_unix_bind(char *filename, int *fd, struct sockaddr_un *sock)
 
   if(access(sockdir, F_OK))
   {
-      if(mkdir(sockdir, S_IRUSR | S_IXUSR | S_IWUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH))
+      if(mkdir(sockdir, PERMS_FULL))
       {
           errno_output("creating directory %s\n", sockdir);
       }
@@ -65,7 +67,7 @@ socket_unix_bind(char *filename, int *fd, struct sockaddr_un *sock)
     return 2;
   }
 
-  if(chmod(filename, S_IRUSR | S_IXUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH |  S_IWOTH | S_IXOTH))
+  if(chmod(filename, PERMS_FULL))
   {
     errno_output("changing socket permissions\n");
     return 6;
