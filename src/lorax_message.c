@@ -24,6 +24,7 @@ struct Options
   int receive_fd;
   int timeout_ms;
   int retries;
+  int message_type;
   uint8_t source_address[6];
   uint8_t destination_address[6];
   uint8_t source_port;
@@ -59,11 +60,12 @@ print_usage(char *progname)
     printf("OPTIONS:\n\
 -h, --help\n\
 -v, --verbose\n\
--t, --txsock [/run/lorax/messages] destination socket we'll send the message to\n\
--r, --rxsock [%s/client.messages] source socket we will listen for a response\n\
--R, --retries [1] number of times to retry if the message fails\n\
--T, --timeout [30000] how long wait for a response on milliseconds\n\
--s, --source-address TODO\n\n", homedir);
+    --type [TYPE] type of message to send. Default is data\n\
+    --txsock [/run/lorax/messages] destination socket we'll send the message to\n\
+    --rxsock [%s/client.messages] source socket we will listen for a response\n\
+    --retries [1] number of times to retry if the message fails\n\
+    --timeout [30000] how long wait for a response on milliseconds\n\
+    --source-address TODO\n\n", homedir);
 }
 
 int
@@ -79,23 +81,25 @@ parse_options(struct Options *opts, int argc, char *argv[])
     err = 0;
     opts->timeout_ms = 30000;
     opts->retries = 1;
+    opts->message_type = MESSAGE_TYPE_DATA;
 
     static struct option long_options[] =
     {
         {"help",                     no_argument, 0, 'h'},
         {"verbose",                  no_argument, 0, 'v'},
-        {"txsock",             required_argument, 0, 't'},
-        {"rxsock",             required_argument, 0, 'r'},
-        {"retries",            required_argument, 0, 'R'},
-        {"timeout",            required_argument, 0, 'T'},
-        {"source-address",     required_argument, 0, 's'}, // TODO
+        {"txsock",             required_argument, 0,   0},
+        {"rxsock",             required_argument, 0,   0},
+        {"retries",            required_argument, 0,   0},
+        {"timeout",            required_argument, 0,   0},
+        {"type",               required_argument, 0,   0},
+        {"source-address",     required_argument, 0,   0}, // TODO
         {0,                                    0, 0,   0}
     };
 
     while(1)
     {
         option_index = 0;
-        c = getopt_long(argc, argv, "hvt:r:R:T:", long_options, &option_index);
+        c = getopt_long(argc, argv, "hv", long_options, &option_index);
 
         if(c == -1)
             break;
@@ -115,21 +119,22 @@ parse_options(struct Options *opts, int argc, char *argv[])
                 opts->timeout_ms = atoi(optarg);
             else if(strcmp("retries", long_options[option_index].name) == 0)
                 opts->retries = atoi(optarg);
+            else if(strcmp("type", long_options[option_index].name) == 0)
+                opts->message_type = atoi(optarg);
+            else if(strcmp("source-address", long_options[option_index].name) == 0)
+            {
+                err = parse_mac_address(optarg, opts->source_address);
+                if(err)
+                {
+                    err_output("unable to parse mac address %s\n", optarg);
+                }
+            }
             break;
         case 'h':
             opts->help = 1;
             break;
         case 'v':
             opts->verbose = 1;
-            break;
-        case 't':
-            opts->txsock = optarg;
-            break;
-        case 'r':
-            opts->rxsock = optarg;
-            break;
-        case 'R':
-            opts->retries = atoi(optarg);
             break;
         }
     }
@@ -152,7 +157,14 @@ parse_options(struct Options *opts, int argc, char *argv[])
     }
 
     // TODO make configurable
-    get_mac_address(opts->source_address, "eth0");
+    if(get_mac_address(opts->source_address, "eth0"))
+    {
+        if(get_mac_address(opts->source_address, "wlan0"))
+        {
+
+        }
+    }
+
     opts->source_port = 1;
 
     if((argc - optind) != 3)
@@ -221,15 +233,23 @@ int poll_loop(struct Options *opts)
         message = (struct Message *) buf;
         message_print(message);
 
-        memcpy(buf, message->data, message->data_length);
-        buf[message->data_length] = '\0';
+        if(message_invalid(buf, bytes_received))
+        {
+            err_output("message received is invalid\n");
+            err = 4;
+        }
+        else
+        {
+            memcpy(buf, message->data, message->data_length);
+            buf[message->data_length] = '\0';
 
-        info_output("Received message data: %s\n", buf);
+            info_output("Received message data: %s\n", buf);
+        }
     }
     else
     {
         err_output("unknown return code from poll\n");
-        err = 4;
+        err = 5;
     }
 
     return err;
@@ -255,6 +275,7 @@ main(int argc, char *argv[])
     info_output("peer socket:  %s\n", opts.txsock);
     info_output("bound socket: %s\n", opts.rxsock);
     info_output("message:      %s\n", opts.message);
+    info_output("message type: %d\n", opts.message_type);
 
     if(socket_create_unix(opts.txsock, &transmit_sock))
     {
@@ -268,9 +289,15 @@ main(int argc, char *argv[])
     }
 
     message = message_make_uninitialized_message((uint8_t *) opts.message, strlen(opts.message));
-    message_make_partial(message, MESSAGE_TYPE_DATA, opts.source_address, opts.destination_address,
+    message_make_partial(message, opts.message_type, opts.source_address, opts.destination_address,
         opts.source_port, opts.destination_port);
     message->retries = opts.retries;
+
+    if(message_invalid((uint8_t *)message, message_total_length(message)))
+    {
+        err_output("message is invalid\n");
+        err = 3;
+    }
 
     if(opts.verbose)
     {
@@ -281,7 +308,7 @@ main(int argc, char *argv[])
     if(socket_unix_send(opts.receive_fd, &transmit_sock, (uint8_t *)message, message_total_length(message)))
     {
         err_output("unable to transmit message\n");
-        err = 3;
+        err = 4;
         goto cleanup;
     }
 
