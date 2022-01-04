@@ -39,11 +39,21 @@ message_swap_source_dest(struct Message *message)
 int
 message_invalid(uint8_t *message, size_t len)
 {
-    // TODO more checks
+    struct Message *msg;
     if(len < sizeof(struct Message))
         return 1;
     if(message == NULL)
         return 2;
+
+    msg = (struct Message *) message;
+    switch(msg->type)
+    {
+        case MESSAGE_TYPE_DATA:
+            break;
+        default:
+            return 3;
+    }
+
     return 0;
 }
 

@@ -5,7 +5,6 @@ Requires=e32.service
 [Service]
 Type=forking
 PIDFile=/run/lorax/lorax.pid
-# TODO need to paramaterize the server socket to not be echo
 ExecStart=/usr/local/bin/lorax \
                               -v \
                               --daemon \
@@ -15,7 +14,7 @@ ExecStart=/usr/local/bin/lorax \
                               --sock-unix-e32-ack /run/lorax/client.ack \
                               --sock-unix-e32-client /run/lorax/client \
                               --sock-unix-e32-data /run/e32.data \
-                              --sock-unix-server /run/lorax/echo
+                              --sock-unix-server /run/lorax/server
 StandardOutput=journal
 StandardError=journal
 

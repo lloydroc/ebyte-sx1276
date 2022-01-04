@@ -6,6 +6,7 @@ struct List *neighbors;
 uint8_t e32_rx_buf[64];
 uint8_t message_rx_buf[64];
 uint8_t control_rx_buf[64];
+static uint8_t zero_address[MESSAGE_ADDRESS_SIZE];
 
 #define NEIGHBOR_STALE_SECONDS 120
 #define CONNECTION_RETRY_SECONDS 3
@@ -361,16 +362,20 @@ lorax_e32_process_packet(struct OptionsLorax *opts, uint8_t *packet, size_t len)
     packet_to_message(packet_received, &message);
     if(lorax_send_message(opts, sock_dest, message))
     {
-        err_output("unable to send message from received packet sending back error packet\n");
+        err_output("lorax_e32_process_packet: unable to send message from received packet to socket %s\n", sock_dest->sun_path);
+
         // send back the same packet with of type ERROR
-        packet_swap_source_dest(packet_received);
-        packet_received->type = PACKET_ERROR_SERVER;
-        packet_compute_checksum(packet_received, packet_received->total_length);
-        if(lorax_send_packet(opts, packet, packet_received->total_length))
+        if(!connection->client)
         {
-            list_remove_first(neighbor->connections);
-            err_output("lorax_e32_process_packet: unable to send packet responding with PACKET_ERROR_SERVER\n");
-            err = 2;
+            packet_swap_source_dest(packet_received);
+            packet_received->type = PACKET_ERROR_SERVER;
+            packet_compute_checksum(packet_received, packet_received->total_length);
+            if(lorax_send_packet(opts, packet, packet_received->total_length))
+            {
+                list_remove_first(neighbor->connections);
+                err_output("lorax_e32_process_packet: unable to send packet responding with PACKET_ERROR_SERVER\n");
+                err = 2;
+            }
         }
     }
 
@@ -462,8 +467,12 @@ lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *packet_bytes, size
         list_add_last(connection->messages, message_copy);
     }
 
+    if(memcmp(message->source_address, zero_address, MESSAGE_ADDRESS_SIZE) == 0)
+    {
+        memcpy(message->source_address, opts->mac_address, MESSAGE_ADDRESS_SIZE);
+    }
+
     // convert the message to a packet
-    // TODO what about source of packet? client shouldn't have to fill in?
     message_to_packet(message, &packet_to_send);
 
     if(lorax_send_packet(opts, (uint8_t *)packet_to_send, packet_to_send->total_length))
@@ -629,7 +638,7 @@ lorax_e32_poll(struct OptionsLorax *opts)
             ret = message_invalid(message_rx_buf, received_bytes);
             if(ret)
             {
-                // TODO send error
+                lorax_send_message_invalid(opts, &sock_source, myself->address, 0, MESSAGE_TYPE_INVALID);
                 err_output("lorax_e32_poll: invalid message from %s of %d bytes got exit code %d ", sock_source.sun_path, received_bytes, ret);
                 continue;
             }

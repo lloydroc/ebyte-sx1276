@@ -31,7 +31,7 @@ print_usage(char *progname)
 {
     printf("Usage: %s [OPTIONS] listen_socket\n", progname);
     printf("Version: %s\n\n", VERSION);
-    printf("A server that listening on a Unix Domain Socket that will echo what was sent.\n\n");
+    printf("A server listening on a Unix Domain Socket that echos what it receives.\n\n");
 
     printf("listen_socket: the full path of the socket to listen on\n");
 

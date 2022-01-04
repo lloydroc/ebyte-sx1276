@@ -4,7 +4,7 @@ Description=lorax echo service service
 [Service]
 Type=forking
 PIDFile=/run/lorax/echo.pid
-ExecStart=/usr/local/bin/lorax_echo -v --daemon --systemd /run/lorax/echo
+ExecStart=/usr/local/bin/lorax_echo -v --daemon --systemd /run/lorax/server
 StandardOutput=journal
 StandardError=journal
 
