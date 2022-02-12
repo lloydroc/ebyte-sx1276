@@ -21,7 +21,7 @@ gpio_permissions_valid()
 
     ret = stat(GPIO_EXPORT_PATH, &statbuf);
     if(ret)
-        errno_output("unable to GPIO on %s\n", GPIO_EXPORT_PATH);
+        errno_output("GPIO PATH is not accessible %s\n", GPIO_EXPORT_PATH);
 
     // file has same uid as the user and has write privledges
     if(uid == statbuf.st_uid && (statbuf.st_mode & S_IWUSR))

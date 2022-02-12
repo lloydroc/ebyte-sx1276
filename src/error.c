@@ -89,7 +89,8 @@ output_errno(int err, const char *format, va_list ap)
 
   vsnprintf(userMsg, BUF_SIZE, format, ap);
 
-  snprintf(errText, BUF_SIZE, " [%s %s]",
+  snprintf(errText, BUF_SIZE, " [%d %s %s]",
+          err,
           (err > 0 && err <= MAX_ENAME) ?
           ename[err] : "?UNKNOWN?", strerror(err));
 

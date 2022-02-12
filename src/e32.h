@@ -9,19 +9,23 @@
 #include "gpio.h"
 #include "uart.h"
 #include "list.h"
+#include "misc.h"
 
 /*
- The e32 has a TX buffer of 512 bytes but how the implemented it's usage
+ The e32 has a TX buffer of 512 bytes but how it's implemented
  with the AUX pin makes things difficult. I've noticied if you write 512
  bytes to it and then wait for AUX to go high, then write another 512 bytes
- you will overwrite most of the 512 bytes. For example maybe the first 64
- bytes would get transmitted then the next would be overwritten. However,
- this seems to happen on the event the buffer is empty originally as if you
+ you will overwrite most of the 512 bytes. Perhaps the first 64
+ bytes would get transmitted then the rest would be overwritten. However,
+ this seems to happen on the event the buffer is empty originally. Ff you
  send 512 continuously the first 512 are dropped but the remaining would be
  sent. This is a potential improvement but needs more consideration. The poor
  documentation of the datasheet and how AUX is implemented makes figuring this
  out quite difficult. For now we'll have to use 58 until a better solution
  can be devised.
+
+ The 58 bytes comes from the datasheet for the TX Buffer length:
+ "Maximum capacity of single package, automatic sub-packing after exceeding"
 */
 #define E32_MAX_PACKET_LENGTH 58
 

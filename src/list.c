@@ -18,7 +18,7 @@ size_t list_destroy(struct List *list)
     num_removed++;
   }
 
-  memset(list,0,sizeof(struct List));
+  memset(list, 0, sizeof(struct List));
   return num_removed;
 }
 
@@ -122,6 +122,26 @@ void* list_get_index(struct List *list, int index)
   return NULL;
 }
 
+void list_foreach(struct List *list, void (*fun)(void *elem))
+{
+  if(fun == NULL)
+    return;
+
+  if(list == NULL)
+    return;
+
+  if(list_size(list) == 0)
+    return;
+
+  struct ListElement *current = list->first;
+  do
+  {
+    fun(current->data);
+    current = current->next;
+  } while(current != NULL);
+
+}
+
 int list_contains(struct List *list, void *data)
 {
   return list_index_of(list,data) != -1;
@@ -155,6 +175,34 @@ int list_index_of(struct List *list, void *data)
   } while(current != NULL);
 
   return -1;
+}
+
+void* list_get(struct List *list, void *data)
+{
+  struct ListElement *current = list->first;
+  int match_result;
+
+  if(current == NULL)
+  {
+    return NULL;
+  }
+
+  if(list->match == NULL)
+  {
+    return NULL;
+  }
+
+  do
+  {
+    match_result = list->match(data, current->data);
+    if(!match_result)
+    {
+      return current->data;
+    }
+    current = current->next;
+  } while(current != NULL);
+
+  return NULL;
 }
 
 int list_set(struct List *list, int index, void *data)
@@ -320,4 +368,91 @@ int list_remove_last(struct List *list)
 size_t list_size(struct List *list)
 {
   return list->size;
+}
+
+void list_iter_init(struct List *list, struct ListIterator *iterator)
+{
+  iterator->list = list;
+  iterator->previous = NULL;
+  iterator->current = list->first;
+  iterator->skip_next = false;
+
+  if(iterator->list->size)
+    iterator->next = list->first->next;
+  else
+    iterator->next = NULL;
+}
+
+int list_iter_has_next(struct ListIterator *iterator)
+{
+  if(iterator->current == NULL)
+    return 0;
+  return 1;
+}
+
+void* list_iter_get(struct ListIterator *iterator)
+{
+  if(iterator->current ==  NULL)
+    return NULL;
+
+  return iterator->current->data;
+}
+
+void list_iter_next(struct ListIterator *iterator)
+{
+  if(iterator->current == NULL)
+    return;
+
+  if(iterator->skip_next == true)
+  {
+    iterator->skip_next = false;
+    return;
+  }
+
+  iterator->previous = iterator->current;
+  iterator->current = iterator->next;
+
+  if(iterator->current != NULL)
+    iterator->next = iterator->next->next;
+}
+
+int list_iter_remove(struct ListIterator *iterator)
+{
+  if(iterator->list->size == 0)
+  {
+    return 0;
+  }
+
+  if(iterator->current == 0)
+  {
+    return 0;
+  }
+
+  /* we're removing the first element */
+  if(iterator->current == iterator->list->first)
+  {
+    iterator->list->first = iterator->current->next;
+  }
+
+  /* we're removing the last element */
+  if(iterator->current == iterator->list->last)
+  {
+    iterator->list->last = iterator->previous;
+  }
+
+  iterator->list->destroy(iterator->current->data);
+  free(iterator->current);
+
+  iterator->current = iterator->next;
+
+  if(iterator->current)
+    iterator->next = iterator->current->next;
+
+  if(iterator->previous)
+    iterator->previous->next = iterator->current;
+
+  iterator->skip_next = true;
+  iterator->list->size--;
+
+  return 0;
 }

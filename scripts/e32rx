@@ -22,7 +22,7 @@ parser.add_argument('--clientsock',
 args = parser.parse_args()
 
 # register a signal handler so when clean up the socket on ^C for instance
-def handler(signum):
+def handler(signum, frame):
     """ Handle signals by closing the socket """
     if signum == signal.SIGINT:
         close_sock()

@@ -1,14 +1,29 @@
 # EByte E32 SX1276 Software for the Raspberry Pi
 
-See this [Blog Post](https://lloydrochester.com/post/hardware/e32-sx1276-lora/) for details.
+This software interacts with the EByte E32 Lora Transceiver. We can interact with it using two methods:
+1. Low Level - writing unstructured bytes to sockets that are sent and received directly to the e32 via the UART
+2. High Level - uses message structures over sockets to implement reliable communications over the low level interface
+
+# Low Level Interface
+
+See this [Blog Post](https://lloydrochester.com/post/hardware/ebyte-e32-lora-getting-started/) for details.
 
 This repository contains the source code, as well as, the source code to distribute the tool which requres GNU Autotools to build. If you just want to run the tool I recommend just getting the tarball below where you can build from source.
 
 This code has also been run on a Pine64 and Orange Pi Zero.
 
+# High Level Interface - Lorax
+
+The high level interface is called lorax. These goals of this high level interface is to send structured data over Lora that is reliable. This data is reliable from the criteria that we have checksums for the packets that are sent and will retry when messages are not responded to. Here are the details of the lorax interface:
+
+1. Interaction over sockets uses a message structure similar to the Internet Protocol
+2. The message is processed and converted to a packet that is sent over the air with Lora
+3. For reliability we will retry failed packets we don't get responses for, or have failed checksums
+4. Broadcasts are sent out and neighbors are stored. This allows us to discover who our neighbors are
+
 # Getting Started
 
-We're going to assume you have 2 E32 Modules attached to two Raspberry PIs. Thus, one can transmit and the other receive and vice-versa. Details for each step in the [Blog Post](https://lloydrochester.com/post/hardware/e32-sx1276-lora/).
+We're going to assume you have 2 E32 Modules attached to two Raspberry PIs. Thus, one can transmit and the other receive and vice-versa. Details for each step in the [Blog Post](https://lloydrochester.com/post/hardware/ebyte-e32-lora-getting-started/).
 
 1. Wire up your E32 module. We require 3 pins. Two for the Mode pins and 1 for the Aux Pin. See section below to change wiring if needed.
 2. Using `raspi-config` configure your Serial Port, Unix groups and UART File Permissions.
@@ -19,8 +34,8 @@ We're going to assume you have 2 E32 Modules attached to two Raspberry PIs. Thus
 ## Install the `e32` command line tool and get status
 
 ```
-wget http://lloydrochester.com/code/e32-1.10.0.tar.gz
-tar zxf e32-1.10.0.tar.gz
+wget http://lloydrochester.com/code/e32-2.0.0.tar.gz
+tar zxf e32-2.0.0.tar.gz
 cd e32-1.10.0
 ./configure
 make
@@ -53,7 +68,7 @@ Run `e32` on both at the same time, no options are needed. In one terminal type 
 
 # Advanced Features
 
-The tool offers more than just taking input from a keyboard. It's meant to run as a daemon and run in the background. If, however, you don't run it as a daemon you can send files and/or save to a file.
+The tool offers more than just taking input from a keyboard. It's meant to run as a daemon in the background. If, however, you don't run it as a daemon you can send files and/or save to a file.
 
 When running as a daemon communication to and from the `e32` is via Unix Domain Socket. This allows other tools written an any language to communicate wirelessly by just sending and receiving from a socket. See the blog post for an example in Python.
 

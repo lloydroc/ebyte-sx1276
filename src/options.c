@@ -145,40 +145,6 @@ options_open_file(char *optarg, char *mode)
   return file;
 }
 
-static int
-options_open_socket_unix(char *filename, int *fd, struct sockaddr_un *sock)
-{
-  *fd = socket(AF_UNIX, SOCK_DGRAM, 0);
-  if(*fd == -1)
-  {
-    errno_output("error opening socket\n");
-    return 1;
-  }
-
-  if(strlen(optarg) > sizeof(sock->sun_path)-1)
-  {
-    err_output("socket path too long must be %d chars\n", sizeof(sock->sun_path)-1);
-    return 2;
-  }
-
-  if(remove(optarg) == -1 && errno != ENOENT)
-  {
-    errno_output("error removing socket\n");
-    return 2;
-  }
-
-  memset(sock, 0, sizeof(struct sockaddr_un));
-  sock->sun_family = AF_UNIX;
-  strncpy(sock->sun_path, optarg, sizeof(sock->sun_path)-1);
-
-  if(bind(*fd, (struct sockaddr*) sock, sizeof(struct sockaddr_un)) == -1)
-  {
-    errno_output("error binding to socket\n");
-    return 3;
-  }
-  return 0;
-}
-
 int
 options_parse_settings(struct options *opts, char *settings)
 {
@@ -190,7 +156,7 @@ options_parse_settings(struct options *opts, char *settings)
 
   if(strnlen(settings, 13) != 12)
   {
-    fprintf(stderr, "options not of length 12");
+    fprintf(stderr, "options not of length 12\n");
     err = 1;
     goto bad_settings;
   }
@@ -284,9 +250,9 @@ options_parse(struct options *opts, int argc, char *argv[])
       else if(strcmp("write-input", long_options[option_index].name) == 0)
         err |= options_parse_settings(opts, optarg);
       else if(strcmp("sock-unix-data", long_options[option_index].name) == 0)
-        err |= options_open_socket_unix(optarg, &opts->fd_socket_unix_data, &opts->socket_unix_data);
+        err |= socket_unix_bind(optarg, &opts->fd_socket_unix_data, &opts->socket_unix_data);
       else if(strcmp("sock-unix-ctrl", long_options[option_index].name) == 0)
-        err |= options_open_socket_unix(optarg, &opts->fd_socket_unix_control, &opts->socket_unix_control);
+        err |= socket_unix_bind(optarg, &opts->fd_socket_unix_control, &opts->socket_unix_control);
       break;
     case 'h':
       opts->help = 1;
@@ -314,10 +280,10 @@ options_parse(struct options *opts, int argc, char *argv[])
       }
       break;
     case 'x':
-      err |= options_open_socket_unix(optarg, &opts->fd_socket_unix_data, &opts->socket_unix_data);
+      err |= socket_unix_bind(optarg, &opts->fd_socket_unix_data, &opts->socket_unix_data);
       break;
     case 'c':
-      err |= options_open_socket_unix(optarg, &opts->fd_socket_unix_control, &opts->socket_unix_control);
+      err |= socket_unix_bind(optarg, &opts->fd_socket_unix_control, &opts->socket_unix_control);
       break;
     case 'd':
       opts->daemon = 1;

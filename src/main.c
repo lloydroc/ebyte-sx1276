@@ -123,7 +123,7 @@ main(int argc, char *argv[])
     err = become_daemon();
     if(err)
     {
-      err_output("mail: error becoming daemon: %d\n", err);
+      err_output("main: error becoming daemon: %d\n", err);
       goto cleanup;
     }
     if(write_pidfile("/run/e32.pid"))

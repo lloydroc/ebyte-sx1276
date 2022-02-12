@@ -714,7 +714,10 @@ e32_write_output(struct E32 *dev, struct options *opts, uint8_t* buf, const size
     addrlen = sizeof(struct sockaddr_un);
 
     if(dev->verbose)
+    {
       debug_output("e32_write_output: sending %d bytes to socket %s", bytes, cl->sun_path);
+      print_hex(buf, bytes);
+    }
 
     outbytes = sendto(opts->fd_socket_unix_data, buf, bytes, 0, (struct sockaddr*) cl, addrlen);
     if(outbytes == -1)
@@ -808,10 +811,12 @@ e32_poll_init(struct E32 *dev, struct options *opts, struct pollfd pfd[])
     dev->isatty = 1;
     info_output("waiting for input from the terminal\n");
   }
-  else {
+  else
+  {
     opts->input_standard = 0;
   }
-    // used for stdin or a pipe
+
+  // used for stdin or a pipe
   pfd[PFD_STDIN].fd = -1;
   pfd[PFD_STDIN].events = 0;
 
@@ -852,7 +857,7 @@ e32_poll_stdin(struct E32 *dev, int fd_stdin, int *loop_continue)
   }
 
   if(dev->verbose)
-    debug_output("e32_poll_stdin: got %d bytes as input writing to uart\n", bytes);
+    debug_output("e32_poll_stdin: got %d bytes as input, writing to uart\n", bytes);
 
   if(e32_transmit(dev, txbuf, bytes))
     return 3;
@@ -946,12 +951,12 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, i
   bytes = recvfrom(fd_sockd, txbuf, E32_MAX_PACKET_LENGTH+1, 0, (struct sockaddr*) &client, &addrlen);
   if(bytes == -1)
   {
-    errno_output("error receiving from unix domain socket");
+    errno_output("e32_poll_socket_unix_data: error receiving from unix domain socket");
     return 1;
   }
   else if(bytes > E32_MAX_PACKET_LENGTH)
   {
-    err_output("overflow: %d > %d", bytes, E32_MAX_PACKET_LENGTH);
+    err_output("e32_poll_socket_unix_data: overflow: %d > %d", bytes, E32_MAX_PACKET_LENGTH);
     client_err++;
   }
 
@@ -1169,7 +1174,10 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
     *rx_buf_size += bytes;
 
     if(dev->verbose)
+    {
       debug_output("e32_poll_gpio_aux: received %d bytes for a total of %d bytes from uart\n", bytes, *rx_buf_size);
+      print_hex(rxbuf, *rx_buf_size);
+    }
 
     if(e32_write_output(dev, opts, rxbuf, *rx_buf_size))
       err_output("e32_poll_gpio_aux: error writing outputs after RX to IDLE transition\n");

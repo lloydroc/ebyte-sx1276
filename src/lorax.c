@@ -1,0 +1,743 @@
+#include "lorax.h"
+
+struct Neighbor *myself;
+struct List *neighbors;
+
+uint8_t e32_rx_buf[64];
+uint8_t message_rx_buf[64];
+uint8_t control_rx_buf[64];
+static uint8_t zero_address[MESSAGE_ADDRESS_SIZE];
+
+#define NEIGHBOR_STALE_SECONDS 120
+#define CONNECTION_RETRY_SECONDS 3
+
+int
+lorax_e32_init(struct OptionsLorax *opts)
+{
+    struct timespec now_time;
+
+    neighbors = malloc(sizeof(struct List));
+    list_init(neighbors, neighbor_match, neighbor_destroy);
+
+    myself = malloc(sizeof(struct Neighbor));
+    memset(myself, 0, sizeof(struct Neighbor));
+    memcpy(myself->address, opts->mac_address, 6);
+
+    myself->connections = malloc(sizeof(struct List));
+    list_init(myself->connections, connection_match, connection_destroy);
+
+    info_output("my source address: %02x%02x%02x%02x%02x%02x\n",
+        myself->address[0],
+        myself->address[1],
+        myself->address[2],
+        myself->address[3],
+        myself->address[4],
+        myself->address[5]
+    );
+
+    if(clock_gettime(CLOCK_REALTIME, &now_time))
+    {
+        err_output("lorax_e32_init: unable to get time\n");
+        return 1;
+    }
+
+    srand(now_time.tv_nsec);
+
+    return 0;
+}
+
+int
+lorax_e32_destroy()
+{
+    list_destroy(neighbors);
+    free(neighbors);
+    free(myself);
+    return 0;
+}
+
+int
+lorax_e32_register(struct OptionsLorax *opts)
+{
+    if(opts->verbose)
+        debug_output("lorax_e32_register: registering client\n");
+
+    if(socket_unix_send_with_ack(opts->fd_socket_e32_data_client, opts->sock_e32_data, NULL, 0, opts->timeout_to_e32_socket_ms))
+    {
+        err_output("unable to register e32\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int
+lorax_send_message_invalid(struct OptionsLorax *opts, struct sockaddr_un *sock_dest, uint8_t destination_address[], uint8_t destination_port, int error_type)
+{
+    struct Message *message;
+    size_t message_len;
+
+    message = message_make_uninitialized_message(NULL, 0);
+    message_make_partial(message, error_type, myself->address, destination_address, 0, destination_port);
+    message_len = message_total_length(message);
+
+    if(opts->verbose)
+    {
+        debug_output("lorax_send_message_invalid: %s ", sock_dest->sun_path);
+        message_print(message);
+    }
+
+    return socket_unix_send(opts->fd_socket_message_data, sock_dest, (uint8_t *) message, message_len);
+}
+
+static int
+lorax_send_message(struct OptionsLorax *opts, struct sockaddr_un *sock_dest, struct Message *message)
+{
+    size_t message_len;
+
+    message_len = message_total_length(message);
+
+    if(opts->verbose)
+    {
+        debug_output("lorax_send_message: %s ", sock_dest->sun_path);
+        message_print(message);
+    }
+
+    return socket_unix_send(opts->fd_socket_message_data, sock_dest, (uint8_t *) message, message_len);
+}
+
+static int
+lorax_send_packet(struct OptionsLorax *opts, uint8_t *packet, ssize_t packet_size)
+{
+    if(opts->verbose)
+    {
+        debug_output("lorax_send_packet: %s ", opts->sock_e32_data.sun_path);
+        packet_print((struct PacketHeader*) packet);
+    }
+
+    return socket_unix_send_with_ack(opts->fd_socket_e32_ack_client, opts->sock_e32_data, packet, packet_size, opts->timeout_to_e32_socket_ms);
+}
+
+static int
+lorax_send_broadcast_packet(struct OptionsLorax *opts)
+{
+    int err;
+    struct PacketHeader *packet;
+    uint8_t *packet_data;
+    uint8_t destination_broadcast[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+    packet_make_uninitialized_packet(&packet, 1);
+    packet_make_partial(packet, PACKET_HEADER_BROADCAST, myself->address, destination_broadcast, 0, 0);
+
+    packet_data = packet_get_data_pointer(packet);
+
+    // set the data section
+    *packet_data = (uint8_t) list_size(neighbors);
+
+    // compute the checksum
+    packet_compute_checksum(packet, packet->total_length);
+
+    clock_gettime(CLOCK_REALTIME, &myself->broadcast_time);
+
+    err = lorax_send_packet(opts, (uint8_t *) packet, packet->total_length);
+
+    free(packet);
+    return err;
+}
+
+static struct Neighbor*
+lorax_find_neighbor_by_address(uint8_t address[])
+{
+    struct Neighbor needle;
+
+    memcpy(needle.address, address, 6);
+
+    // TODO do we need to check for ourself?
+    if(neighbor_match(myself, &needle) == 0)
+    {
+        return myself;
+    }
+
+    return list_get(neighbors, &needle);
+}
+
+static int
+lorax_neighbor_loop(struct OptionsLorax *opts)
+{
+    struct Neighbor *neighbor;
+    struct Connection *connection;
+    struct Message *message;
+    struct PacketHeader *packet;
+    struct timespec now_time;
+
+    struct ListIterator neighbors_iter;
+    struct ListIterator connections_iter;
+
+    time_t delta_seconds;
+
+    list_iter_init(neighbors, &neighbors_iter);
+
+    clock_gettime(CLOCK_REALTIME, &now_time);
+
+    debug_output("lorax_neighbor_loop\n");
+
+    while(list_iter_has_next(&neighbors_iter))
+    {
+        neighbor = list_iter_get(&neighbors_iter);
+
+        /* neighbors we have not heard from in a long time
+           we will remove
+        */
+       delta_seconds = now_time.tv_sec - neighbor->broadcast_time.tv_sec;
+       if(delta_seconds > NEIGHBOR_STALE_SECONDS)
+       {
+            warn_output("lorax_neighbor_loop: not heard from neighbor for %d seconds, removing:");
+            neighbor_print(neighbor);
+            list_iter_remove(&neighbors_iter);
+            continue;
+       }
+
+        list_iter_init(neighbor->connections, &connections_iter);
+
+        while(list_iter_has_next(&connections_iter))
+        {
+            connection = list_iter_get(&connections_iter);
+
+            delta_seconds = now_time.tv_sec - connection->state_time.tv_sec;
+            if(connection->connection_state == STATE_WAITING_PACKET && delta_seconds > CONNECTION_RETRY_SECONDS)
+            {
+                message = list_get_first(connection->messages);
+
+                if(message == NULL)
+                {
+                    list_iter_next(&connections_iter);
+                    continue;
+                }
+
+                if(message->retries)
+                {
+                    warn_output("lorax_neighbor_loop: retry packet %dx\n", message->retries);
+                    message->retries--;
+                    message_to_packet(message, &packet);
+                    lorax_send_packet(opts, (uint8_t *)packet, packet->total_length);
+                    free(packet);
+                    return 1;
+                }
+                // have a message but retries are zero
+                else
+                {
+                    // exhausted retries send message to client
+                    message->type = MESSAGE_TYPE_UNREACHABLE;
+                    if(socket_unix_send(opts->fd_socket_message_data, connection->sock_client, (uint8_t *) message, message_total_length(message)))
+                    {
+                        err_output("lorax_neighbor_loop: unreachable. unable to send message to client\n");
+                    }
+                    list_remove_first(connection->messages);
+                    connection->connection_state = STATE_WAITING_MESSAGE;
+                    clock_gettime(CLOCK_REALTIME, &connection->state_time);
+                    warn_output("lorax_neighbor_loop: retries exceeded ... message not delivered\n");
+                    return 2;
+                }
+                // loop through messages and retry them
+                // retry
+            }
+
+            /* connections need to be retried or purged.
+               when we retry we send back to the e32. when
+               we purge them we send back to the client socket
+               that we could not deliver the message
+            */
+            list_iter_next(&connections_iter);
+        }
+
+        list_iter_next(&neighbors_iter);
+    }
+
+    return 0;
+}
+
+/*
+    Add or update the neighbor to our neighbor list.
+*/
+static int
+lorax_e32_process_broadcast_packet(struct PacketHeader *packet, struct OptionsLorax *opts)
+{
+    struct Neighbor *neighbor;
+    uint8_t *num_neighbors_ptr;
+
+    /* update the neighbor if in the list */
+    neighbor = lorax_find_neighbor_by_address(packet->source_address);
+    if(neighbor == NULL)
+    {
+        neighbor = neighbor_make_uninitialzed(packet->type, packet->source_address, connection_match, connection_destroy);
+        info_output("lorax_e32_process_broadcast_packet: new neighbor %02x%02x%02x%02x%02x%02x\n",
+            packet->source_address[0],
+            packet->source_address[1],
+            packet->source_address[2],
+            packet->source_address[3],
+            packet->source_address[4],
+            packet->source_address[5]);
+        neighbor_print(neighbor);
+        list_add_last(neighbors, neighbor);
+    }
+    else
+    {
+        neighbor->type = packet->type;
+        clock_gettime(CLOCK_REALTIME, &neighbor->broadcast_time);
+    }
+
+    num_neighbors_ptr = (uint8_t *)packet+sizeof(struct PacketHeader);
+    neighbor->num_neighbors = *num_neighbors_ptr;
+
+    return 0;
+}
+
+/*
+    Process Packets from reception
+    It is assumed the packet is valid.
+
+    Packets are the lower level that get passed up to messages.
+    These messages are sent either to the client who sent the
+    message in the first place as a reply. Or to a server to
+    which the request will come to.
+
+    We can also send packets back instead of messages for example
+    when we are unable to send a packet upstream we'll send back
+    an error packet.
+*/
+int
+lorax_e32_process_packet(struct OptionsLorax *opts, uint8_t *packet, size_t len)
+{
+    //uint8_t packet_to_send_header;
+    struct PacketHeader *packet_received;
+    //enum STATE_CONNECTION new_state, existing_state;
+    struct Neighbor *neighbor;
+    struct Connection *connection;
+    struct Message *message;
+    struct sockaddr_un *sock_dest;
+    int err;
+
+    err = 0;
+    packet_received = (struct PacketHeader *) packet;
+
+    if(packet_received->type == PACKET_HEADER_BROADCAST)
+    {
+        return lorax_e32_process_broadcast_packet(packet_received, opts);
+    }
+
+    if(memcmp(packet_received->destination_address, myself->address, PACKET_ADDRESS_SIZE))
+    {
+        debug_output("not processing packet as destination address doesn't match");
+        return 0;
+    }
+
+    neighbor = lorax_find_neighbor_by_address(packet_received->source_address);
+
+    if(neighbor == NULL)
+    {
+        neighbor = neighbor_make_uninitialzed(0, packet_received->source_address, connection_match, connection_destroy);
+        list_add_first(neighbors, neighbor);
+        debug_output("lorax_e32_process_packet: new neighbor ");
+        neighbor_print(neighbor);
+    }
+
+    connection = connection_lookup(neighbor->connections, packet_received->destination_port, packet_received->source_port);
+    if(connection == NULL)
+    {
+        connection = connection_make_uninitialzed(STATE_WAITING_PACKET, packet_received->destination_port, packet_received->source_port, message_match, message_destroy);
+        list_add_first(neighbor->connections, connection);
+        debug_output("lorax_e32_process_packet: new connection\n");
+        connection_print(connection);
+    }
+
+    if(connection->client)
+    {
+        sock_dest = connection->sock_client;
+    }
+    else
+    {
+        sock_dest = &opts->sock_server_data;
+    }
+
+    if(sock_dest == NULL || strnlen(sock_dest->sun_path, sizeof(struct sockaddr_un)) == 0)
+        warn_output("no server socket specified");
+
+    packet_to_message(packet_received, &message);
+    if(lorax_send_message(opts, sock_dest, message))
+    {
+        err_output("lorax_e32_process_packet: unable to send message from received packet to socket %s\n", sock_dest->sun_path);
+
+        // send back the same packet with of type ERROR
+        if(!connection->client)
+        {
+            packet_swap_source_dest(packet_received);
+            packet_received->type = PACKET_ERROR_SERVER;
+            packet_compute_checksum(packet_received, packet_received->total_length);
+            if(lorax_send_packet(opts, packet, packet_received->total_length))
+            {
+                list_remove_first(neighbor->connections);
+                err_output("lorax_e32_process_packet: unable to send packet responding with PACKET_ERROR_SERVER\n");
+                err = 2;
+            }
+        }
+    }
+
+    connection->connection_state = STATE_WAITING_MESSAGE;
+    clock_gettime(CLOCK_REALTIME, &connection->state_time);
+    neighbor->broadcast_time = connection->state_time;
+
+    if(list_size(connection->messages))
+        list_remove_first(connection->messages);
+
+    free(message);
+
+    return err;
+}
+
+/*
+    Process Messages from clients.
+
+    We will normally conver the message to a packet and send it. However,
+    the message can also be a request for some information such as the
+    known neighors in which we can send a message back.
+*/
+int
+lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *message_bytes, size_t len, struct sockaddr_un *sock_source)
+{
+
+    int err;
+    struct Message *message, *message_copy;
+    struct PacketHeader *packet_to_send;
+    struct Neighbor *neighbor, neighbor_lookup;
+    struct Connection *connection;
+
+    err = 0;
+
+    message = (struct Message *) message_bytes;
+
+    if(strncmp(sock_source->sun_path, (const char*) &opts->sock_server_data.sun_path, strnlen(sock_source->sun_path, sizeof(struct sockaddr_un))) == 0)
+    {
+        debug_output("message was received by server: swapping source and destination addresses\n");
+        message_swap_source_dest(message);
+    }
+
+    if(memcmp(message->source_address, myself->address, MESSAGE_ADDRESS_SIZE))
+    {
+        warn_output("received message with source address not equal to our address\n");
+    }
+
+    memcpy(neighbor_lookup.address, message->destination_address, 6);
+
+    /* lookup neighbor */
+    neighbor = lorax_find_neighbor_by_address(neighbor_lookup.address);
+
+    // create neighbor if it doesn't exist
+    if(neighbor == NULL)
+    {
+        neighbor = neighbor_make_uninitialzed(0, message->destination_address, connection_match, connection_destroy);
+        list_add_first(neighbors, neighbor);
+        debug_output("lorax_e32_process_message: new neighbor ");
+        neighbor_print(neighbor);
+    }
+
+    /* make a new connection and send the message */
+    connection = connection_lookup(neighbor->connections, message->source_port, message->destination_port);
+    if(connection == NULL)
+    {
+        connection = connection_make_uninitialzed(STATE_WAITING_PACKET, message->source_port, message->destination_port, message_match, message_destroy);
+        connection->client = true;
+        connection->sock_client = malloc(sizeof(struct sockaddr_un));
+        memcpy(connection->sock_client, sock_source, sizeof(struct sockaddr_un));
+        list_add_first(neighbor->connections, connection);
+        debug_output("lorax_e32_process_message: new connection ");
+        connection_print(connection);
+    }
+    else if(connection->connection_state == STATE_WAITING_PACKET)
+    {
+        // FIXME we should send back message to client not send a packet
+        // TODO
+        warn_output("message is STATE_WAITING_PACKET\n");
+    }
+
+    connection->connection_state = STATE_WAITING_PACKET;
+    clock_gettime(CLOCK_REALTIME, &connection->state_time);
+
+    /* only add the message for retries if client and not the server */
+    if(strncmp(sock_source->sun_path, opts->sock_server_data.sun_path, strlen(sock_source->sun_path)))
+    {
+        message_copy = malloc(message_total_length(message));
+        memcpy(message_copy, message, message_total_length(message));
+        list_add_last(connection->messages, message_copy);
+    }
+
+    if(memcmp(message->source_address, zero_address, MESSAGE_ADDRESS_SIZE) == 0)
+    {
+        memcpy(message->source_address, opts->mac_address, MESSAGE_ADDRESS_SIZE);
+    }
+
+    // convert the message to a packet
+    message_to_packet(message, &packet_to_send);
+
+    if(lorax_send_packet(opts, (uint8_t *)packet_to_send, packet_to_send->total_length))
+    {
+        list_remove_first(neighbor->connections);
+        err = 2;
+        err_output("lorax_e32_process_message: unable to send packet from received message");
+    }
+
+    free(packet_to_send);
+
+    return err;
+}
+
+/*
+    Process Control from clients.
+
+    For example the client may want to know what the neighborlist looks like.
+*/
+int
+lorax_e32_process_control(struct OptionsLorax *opts, uint8_t *control_bytes, size_t len, struct sockaddr_un *sock_source)
+{
+
+    int err;
+    uint8_t *control_response;
+    size_t control_response_len;
+
+    err = 0;
+
+    switch(control_bytes[0])
+    {
+        case CONTROL_REQUEST_GET_NEIGHBORS:
+            control_get_neighbors(neighbors, &control_response, &control_response_len);
+            break;
+        case CONTROL_REQUEST_GET_MY_ADDRESS:
+            control_get_my_address(myself->address, &control_response, &control_response_len);
+            break;
+        default:
+            control_response = malloc(1);
+            control_response_len = 1;
+            control_response[0] = CONTROL_RESPONSE_ERROR;
+            err = 1;
+            break;
+    }
+
+    if(socket_unix_send(opts->fd_socket_control, sock_source, control_response, control_response_len))
+    {
+        err_output("lorax_e32_process_control: unable to send %d bytes to socket %s\n", control_response_len, sock_source->sun_path);
+        err = 2;
+    }
+    else if (opts->verbose)
+    {
+        debug_output("lorax_e32_process_control: sent %d bytes to socket %s\n", control_response_len, sock_source->sun_path);
+    }
+
+    free(control_response);
+
+    return err;
+}
+
+int
+lorax_e32_send_control_error(struct OptionsLorax *opts, struct sockaddr_un *sock_source)
+{
+    uint8_t err = CONTROL_RESPONSE_ERROR;
+    return socket_unix_send(opts->fd_socket_control, sock_source, &err, 1);
+}
+
+int
+lorax_e32_poll(struct OptionsLorax *opts)
+{
+    int ret;
+    struct pollfd pfd[3];
+    struct PacketHeader *received_packet;
+    struct Message *received_message;
+
+    /* info from other sockets */
+    struct sockaddr_un sock_source;
+    ssize_t received_bytes;
+
+    /* for time keeping */
+    struct timespec now_time;
+    int seconds_ago_broadcast;
+    int timeout_broadcast_s = opts->timeout_broadcast_ms/1000;
+
+    int timeout_random_ms;
+    bool quick_timeout = false;
+
+    pfd[0].fd = opts->fd_socket_e32_data_client;
+    pfd[0].events = POLLIN;
+    pfd[1].fd = opts->fd_socket_message_data;
+    pfd[1].events = POLLIN;
+    pfd[2].fd = opts->fd_socket_control;
+    pfd[2].events = POLLIN;
+
+    for(;;)
+    {
+        timeout_random_ms = get_random_timeout(list_size(neighbors));
+
+        if(!quick_timeout)
+            timeout_random_ms += opts->timeout_broadcast_ms;
+
+        /*
+            The timeout to poll is a big deal! This timeout is one
+            of the most complex parts of this program.
+
+            The main reason it's a big deal is we want to squeeze in
+            broadcast messages. This can be when we have messages
+            we're receiving and/or transmitting. If we're busy then poll
+            will never timeout so there are multiple scenarios to consider
+            when thinking about broadcasts.
+
+            Scenario 1:
+                Not a lot going in over LORA. Here we'll have a !quick_timeout.
+                In this scenario we'll have a random timeout based on the number
+                of neighbors we have PLUS we'll add a longer timeout so we're not
+                just sending broadcasts all the time. This longer timeout is an
+                option to the program.
+
+            Scenario 2:
+                We have more going on over the air. In this case we'll skip the
+                long timeout and just go with the random timeout based on the
+                number of neighbors. How do we know when to skip? We know this
+                based on the last time we sent a broadcast. If it exceeds the
+                longer timeout option then well reduce our poll timeout.
+
+            The retries also come into play for retransmissions. If we're
+            expecting a packet back from a message we sent on a timeout
+            will be the time to retry sending the packet.
+
+            There is one other thing to consider on a macro level. We cannot
+            get in a situation where we have many lorax that will synchronize
+            on when messages and/or retries are sent. This has happened in the
+            past. One lorax will timeout and send a broadcast, which triggers
+            a broadcast storm.
+
+            The logic is such that we will prefer to retry messages over broadcasts.
+            If we don't have any messages to retry then we'll send broadcasts.
+
+        */
+        ret = poll(pfd, 3, timeout_random_ms);
+        quick_timeout = false;
+        if(ret == 0)
+        {
+            if(lorax_neighbor_loop(opts))
+            {
+
+            }
+            else if(lorax_send_broadcast_packet(opts))
+            {
+                err_output("lorax_e32_poll: unable to send broadcast in poll timeout\n");
+            }
+            continue;
+        }
+        if(ret < 0)
+        {
+            errno_output("lorax_e32_poll: error polling\n");
+            sleep(3);
+        }
+
+        /* e32 data client sending data to us */
+        if(pfd[0].revents & POLLIN)
+        {
+            if(socket_unix_receive(pfd[0].fd, e32_rx_buf, sizeof(e32_rx_buf), &received_bytes, &sock_source))
+            {
+                errno_output("lorax_e32_poll: error receiving from e32 socket\n");
+                continue;
+            }
+
+            ret = packet_invalid(e32_rx_buf, received_bytes);
+            if(ret)
+            {
+                err_output("lorax_e32_poll: invalid packet of %d bytes got exit code %d\n", received_bytes, ret);
+                continue;
+            }
+
+            received_packet = (struct PacketHeader *) e32_rx_buf;
+
+            if(opts->verbose)
+            {
+                info_output("lorax_e32_poll: received packet");
+                packet_print(received_packet);
+            }
+
+            if(lorax_e32_process_packet(opts, e32_rx_buf, received_bytes))
+            {
+                err_output("lorax_e32_poll: unable to process packet\n");
+            }
+        }
+
+        /* client sending data for us to send to the e32 client to transmit */
+        if(pfd[1].revents & POLLIN)
+        {
+            if(socket_unix_receive(pfd[1].fd, message_rx_buf, sizeof(message_rx_buf), &received_bytes, &sock_source))
+            {
+                errno_output("lorax_e32_poll: error receiving from message socket\n");
+                return 1;
+            }
+
+            ret = message_invalid(message_rx_buf, received_bytes);
+            if(ret)
+            {
+                lorax_send_message_invalid(opts, &sock_source, myself->address, 0, MESSAGE_TYPE_INVALID);
+                err_output("lorax_e32_poll: invalid message from %s of %d bytes got exit code %d ", sock_source.sun_path, received_bytes, ret);
+                continue;
+            }
+
+            received_message = (struct Message*) message_rx_buf;
+            if(received_message->data_length > MESSAGE_MAX_DATA_LEN)
+            {
+                err_output("lorax_e32_poll: message too large. data > %d\n", MESSAGE_MAX_DATA_LEN);
+                lorax_send_message_invalid(opts, &sock_source, received_message->source_address, received_message->source_port, MESSAGE_TYPE_TOO_LARGE);
+                continue;
+            }
+
+            info_output("lorax_e32_poll: received message from %s ", sock_source.sun_path);
+            if(opts->verbose)
+            {
+                message_print((struct Message *) message_rx_buf);
+            }
+
+            if(lorax_e32_process_message(opts, message_rx_buf, received_bytes, &sock_source))
+            {
+                err_output("lorax_e32_poll: unable to process message\n");
+            }
+        }
+
+        /* client control to query our neighbors and make changes to our internal structures */
+        if(pfd[2].revents & POLLIN)
+        {
+            if(socket_unix_receive(pfd[2].fd, control_rx_buf, sizeof(control_rx_buf), &received_bytes, &sock_source))
+            {
+                errno_output("lorax_e32_poll: error receiving from control socket\n");
+                return 1;
+            }
+
+            ret = control_request_invalid(control_rx_buf, received_bytes);
+            if(ret)
+            {
+                lorax_e32_send_control_error(opts, &sock_source);
+                err_output("lorax_e32_poll: invalid control from %s of %d bytes got exit code %d ", sock_source.sun_path, received_bytes, ret);
+                continue;
+            }
+
+            if(lorax_e32_process_control(opts, control_rx_buf, received_bytes, &sock_source))
+            {
+                err_output("lorax_e32_poll: unable to process control\n");
+            }
+        }
+
+        if(lorax_neighbor_loop(opts))
+        {
+
+        }
+        else
+        {
+            clock_gettime(CLOCK_REALTIME, &now_time);
+            seconds_ago_broadcast = now_time.tv_sec - myself->broadcast_time.tv_sec;
+            if(seconds_ago_broadcast > timeout_broadcast_s)
+            {
+                quick_timeout = true;
+                /*if(lorax_send_broadcast_packet(opts))
+                    err_output("lorax_e32_poll: unable to send broadcast in poll\n");*/
+            }
+        }
+    }
+}
