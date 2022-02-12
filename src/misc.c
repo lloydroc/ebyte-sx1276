@@ -108,6 +108,6 @@ get_random_timeout(int num_neighbors)
 
   num_slots = num_neighbors*3;
   slot = rand() % num_slots;
-  timeout_random_ms = slot*100;
+  timeout_random_ms = slot*1000;
   return timeout_random_ms;
 }

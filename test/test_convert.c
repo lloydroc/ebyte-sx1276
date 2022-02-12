@@ -25,6 +25,7 @@ main(int argc, char *argv[])
     assert(memcmp(source_address, message->source_address, 6) == 0);
     assert(memcmp(destination_address, message->destination_address, 6) == 0);
     assert(message->data_length == DATA_LEN);
+    assert(message->data_length == (message_total_length(message)-sizeof(struct Message)));
 
     // convert a message to a packet
     message_to_packet(message, &packet);
@@ -38,11 +39,13 @@ main(int argc, char *argv[])
 
     assert(memcmp(packet->source_address, message2->source_address, 6) == 0);
     assert(memcmp(packet->destination_address, message2->destination_address, 6) == 0);
+    assert(message2->data_length == DATA_LEN);
 
     // convert the message to another packet
     message_to_packet(message2, &packet2);
     assert(memcmp(packet2->source_address, message2->source_address, 6) == 0);
     assert(memcmp(packet2->destination_address, message2->destination_address, 6) == 0);
+    assert(packet_get_data_size(packet2) == DATA_LEN);
 
     assert(((void *)message) != ((void *)packet));
     assert(((void *)message) != ((void *)message2));

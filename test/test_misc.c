@@ -30,7 +30,7 @@ main(int argc, char *argv[])
     printf("time is %s\n", strtime);
     assert(strlen(strtime));
 
-    int max_timeout_delay_ms = 3*2*100;
+    int max_timeout_delay_ms = 3*2*1000;
     for(int i=0; i<1000; i++)
     {
         int rando = get_random_timeout(2);

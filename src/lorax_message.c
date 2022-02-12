@@ -79,8 +79,8 @@ parse_options(struct Options *opts, int argc, char *argv[])
     memset(opts, 0, sizeof(struct Options));
 
     err = 0;
-    opts->timeout_ms = 30000;
-    opts->retries = 1;
+    opts->timeout_ms = 55000;
+    opts->retries = 3;
     opts->message_type = MESSAGE_TYPE_DATA;
 
     static struct option long_options[] =
@@ -199,6 +199,7 @@ int poll_loop(struct Options *opts)
     struct sockaddr_un lorax_sock;
     struct Message *message;
     uint8_t buf[1024];
+    char *message_ptr;
     ssize_t bytes_received;
     int ret, err;
 
@@ -211,20 +212,21 @@ int poll_loop(struct Options *opts)
     if(ret == 0)
     {
         err_output("timed out waiting for response\n");
-        err = 1;
+        err = 10;
     }
     else if(ret < 0)
     {
         errno_output("error polling\n");
-        err = 2;
+        err = 11;
     }
     else if(pfd[0].revents & POLLIN)
     {
         if(socket_unix_receive(opts->receive_fd, buf, 1024, &bytes_received, &lorax_sock))
         {
             err_output("unable to receive from lorax socket\n");
-            err = 3;
+            err = 12;
         }
+
         info_output("received %d bytes from %s\n", bytes_received, lorax_sock.sun_path);
         if(message_invalid(buf, bytes_received))
         {
@@ -236,20 +238,20 @@ int poll_loop(struct Options *opts)
         if(message_invalid(buf, bytes_received))
         {
             err_output("message received is invalid\n");
-            err = 4;
+            err = 13;
         }
         else
         {
-            memcpy(buf, message->data, message->data_length);
-            buf[message->data_length] = '\0';
+            message_ptr = (char *) message->data;
+            message_ptr[message->data_length] = '\0';
 
-            info_output("Received message data: %s\n", buf);
+            info_output("Received message data [%d bytes]: %s\n", message->data_length, message_ptr);
         }
     }
     else
     {
         err_output("unknown return code from poll\n");
-        err = 5;
+        err = 14;
     }
 
     return err;
@@ -288,6 +290,8 @@ main(int argc, char *argv[])
         err = 2;
     }
 
+    printf("text is %d %s\n", strlen(opts.message), opts.message);
+
     message = message_make_uninitialized_message((uint8_t *) opts.message, strlen(opts.message));
     message_make_partial(message, opts.message_type, opts.source_address, opts.destination_address,
         opts.source_port, opts.destination_port);
@@ -301,8 +305,9 @@ main(int argc, char *argv[])
 
     if(opts.verbose)
     {
+        info_output("transmitting message of %d bytes: ", message_total_length(message));
         message_print(message);
-        info_output("transmitting message: ");
+
     }
 
     if(socket_unix_send(opts.receive_fd, &transmit_sock, (uint8_t *)message, message_total_length(message)))

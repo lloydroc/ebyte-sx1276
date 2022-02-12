@@ -40,6 +40,7 @@ int
 message_invalid(uint8_t *message, size_t len)
 {
     struct Message *msg;
+    int byte_len;
     if(len < sizeof(struct Message))
         return 1;
     if(message == NULL)
@@ -53,6 +54,10 @@ message_invalid(uint8_t *message, size_t len)
         default:
             return 3;
     }
+
+    byte_len = message_total_length(msg)-sizeof(struct Message);
+    if (byte_len != msg->data_length)
+        return 4;
 
     return 0;
 }

@@ -14,6 +14,8 @@ static uint8_t zero_address[MESSAGE_ADDRESS_SIZE];
 int
 lorax_e32_init(struct OptionsLorax *opts)
 {
+    struct timespec now_time;
+
     neighbors = malloc(sizeof(struct List));
     list_init(neighbors, neighbor_match, neighbor_destroy);
 
@@ -32,6 +34,14 @@ lorax_e32_init(struct OptionsLorax *opts)
         myself->address[4],
         myself->address[5]
     );
+
+    if(clock_gettime(CLOCK_REALTIME, &now_time))
+    {
+        err_output("lorax_e32_init: unable to get time\n");
+        return 1;
+    }
+
+    srand(now_time.tv_nsec);
 
     return 0;
 }
@@ -180,17 +190,10 @@ lorax_neighbor_loop(struct OptionsLorax *opts)
        delta_seconds = now_time.tv_sec - neighbor->broadcast_time.tv_sec;
        if(delta_seconds > NEIGHBOR_STALE_SECONDS)
        {
-            warn_output("not heard from neighbor for %d seconds, removing: %02x%02x%02x%02x%02x%02x\n",
-                NEIGHBOR_STALE_SECONDS,
-                neighbor->address[0],
-                neighbor->address[1],
-                neighbor->address[2],
-                neighbor->address[3],
-                neighbor->address[4],
-                neighbor->address[5]
-            );
-           list_iter_remove(&neighbors_iter);
-           continue;
+            warn_output("lorax_neighbor_loop: not heard from neighbor for %d seconds, removing:");
+            neighbor_print(neighbor);
+            list_iter_remove(&neighbors_iter);
+            continue;
        }
 
         list_iter_init(neighbor->connections, &connections_iter);
@@ -198,7 +201,6 @@ lorax_neighbor_loop(struct OptionsLorax *opts)
         while(list_iter_has_next(&connections_iter))
         {
             connection = list_iter_get(&connections_iter);
-            connection_print(connection);
 
             delta_seconds = now_time.tv_sec - connection->state_time.tv_sec;
             if(connection->connection_state == STATE_WAITING_PACKET && delta_seconds > CONNECTION_RETRY_SECONDS)
@@ -211,11 +213,9 @@ lorax_neighbor_loop(struct OptionsLorax *opts)
                     continue;
                 }
 
-                message_print(message);
-
                 if(message->retries)
                 {
-                    warn_output("retry packet %dx\n", message->retries);
+                    warn_output("lorax_neighbor_loop: retry packet %dx\n", message->retries);
                     message->retries--;
                     message_to_packet(message, &packet);
                     lorax_send_packet(opts, (uint8_t *)packet, packet->total_length);
@@ -229,10 +229,12 @@ lorax_neighbor_loop(struct OptionsLorax *opts)
                     message->type = MESSAGE_TYPE_UNREACHABLE;
                     if(socket_unix_send(opts->fd_socket_message_data, connection->sock_client, (uint8_t *) message, message_total_length(message)))
                     {
-                        err_output("unreachable: unable to send message to client\n");
+                        err_output("lorax_neighbor_loop: unreachable. unable to send message to client\n");
                     }
                     list_remove_first(connection->messages);
-                    warn_output("retries exceeded ... message not delivered\n");
+                    connection->connection_state = STATE_WAITING_MESSAGE;
+                    clock_gettime(CLOCK_REALTIME, &connection->state_time);
+                    warn_output("lorax_neighbor_loop: retries exceeded ... message not delivered\n");
                     return 2;
                 }
                 // loop through messages and retry them
@@ -399,7 +401,7 @@ lorax_e32_process_packet(struct OptionsLorax *opts, uint8_t *packet, size_t len)
     known neighors in which we can send a message back.
 */
 int
-lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *packet_bytes, size_t len, struct sockaddr_un *sock_source)
+lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *message_bytes, size_t len, struct sockaddr_un *sock_source)
 {
 
     int err;
@@ -410,7 +412,7 @@ lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *packet_bytes, size
 
     err = 0;
 
-    message = (struct Message *) packet_bytes;
+    message = (struct Message *) message_bytes;
 
     if(strncmp(sock_source->sun_path, (const char*) &opts->sock_server_data.sun_path, strnlen(sock_source->sun_path, sizeof(struct sockaddr_un))) == 0)
     {
@@ -479,6 +481,7 @@ lorax_e32_process_message(struct OptionsLorax *opts, uint8_t *packet_bytes, size
     {
         list_remove_first(neighbor->connections);
         err = 2;
+        err_output("lorax_e32_process_message: unable to send packet from received message");
     }
 
     free(packet_to_send);
@@ -573,6 +576,44 @@ lorax_e32_poll(struct OptionsLorax *opts)
         if(!quick_timeout)
             timeout_random_ms += opts->timeout_broadcast_ms;
 
+        /*
+            The timeout to poll is a big deal! This timeout is one
+            of the most complex parts of this program.
+
+            The main reason it's a big deal is we want to squeeze in
+            broadcast messages. This can be when we have messages
+            we're receiving and/or transmitting. If we're busy then poll
+            will never timeout so there are multiple scenarios to consider
+            when thinking about broadcasts.
+
+            Scenario 1:
+                Not a lot going in over LORA. Here we'll have a !quick_timeout.
+                In this scenario we'll have a random timeout based on the number
+                of neighbors we have PLUS we'll add a longer timeout so we're not
+                just sending broadcasts all the time. This longer timeout is an
+                option to the program.
+
+            Scenario 2:
+                We have more going on over the air. In this case we'll skip the
+                long timeout and just go with the random timeout based on the
+                number of neighbors. How do we know when to skip? We know this
+                based on the last time we sent a broadcast. If it exceeds the
+                longer timeout option then well reduce our poll timeout.
+
+            The retries also come into play for retransmissions. If we're
+            expecting a packet back from a message we sent on a timeout
+            will be the time to retry sending the packet.
+
+            There is one other thing to consider on a macro level. We cannot
+            get in a situation where we have many lorax that will synchronize
+            on when messages and/or retries are sent. This has happened in the
+            past. One lorax will timeout and send a broadcast, which triggers
+            a broadcast storm.
+
+            The logic is such that we will prefer to retry messages over broadcasts.
+            If we don't have any messages to retry then we'll send broadcasts.
+
+        */
         ret = poll(pfd, 3, timeout_random_ms);
         quick_timeout = false;
         if(ret == 0)
@@ -613,17 +654,14 @@ lorax_e32_poll(struct OptionsLorax *opts)
 
             if(opts->verbose)
             {
-                debug_output("lorax_e32_poll: received ");
+                info_output("lorax_e32_poll: received packet");
                 packet_print(received_packet);
             }
 
             if(lorax_e32_process_packet(opts, e32_rx_buf, received_bytes))
             {
                 err_output("lorax_e32_poll: unable to process packet\n");
-                continue;
             }
-            // TODO the continues are crazy
-            continue;
         }
 
         /* client sending data for us to send to the e32 client to transmit */
@@ -660,9 +698,7 @@ lorax_e32_poll(struct OptionsLorax *opts)
             if(lorax_e32_process_message(opts, message_rx_buf, received_bytes, &sock_source))
             {
                 err_output("lorax_e32_poll: unable to process message\n");
-                continue;
             }
-            continue;
         }
 
         /* client control to query our neighbors and make changes to our internal structures */
@@ -685,7 +721,6 @@ lorax_e32_poll(struct OptionsLorax *opts)
             if(lorax_e32_process_control(opts, control_rx_buf, received_bytes, &sock_source))
             {
                 err_output("lorax_e32_poll: unable to process control\n");
-                continue;
             }
         }
 
