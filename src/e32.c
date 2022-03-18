@@ -1054,7 +1054,7 @@ e32_poll_socket_unix_control(struct E32 *dev, struct options *opts, int fd_sockc
     memcpy(control, dev->version, sizeof(dev->version));
     ret_bytes = sizeof(dev->version);
   }
-  else if(bytes == 6 && (control[0] == 0xC0 || control[0] == 0xC3))
+  else if(bytes == 6 && (control[0] == 0xC0 || control[0] == 0xC2))
   {
     if(e32_cmd_write_settings(dev, control))
       client_err = 5;
