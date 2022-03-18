@@ -9,7 +9,9 @@ Run the e32 like so:
 $ e32 -v --sock-unix-ctrl $HOME/e32.control --sock-unix-data $HOME/e32.data
 
 Then run the test like so:
-$ python3 ebyte-sx1276/test/e32_test.py 
+$ python3 ebyte-sx1276/test/e32_test.py
+
+Note tests will fail if the sock file $HOME/client exists
 """
 
 import socket
@@ -42,7 +44,7 @@ class TestE32ControlSocket(unittest.TestCase):
     def setUp(self):
         """ Open the client socket each time """
         self.client_socket = open_client_socket()
-    
+
     def tearDown(self):
         """ close the socket """
         close_client_socket(self.client_socket, CLIENT_SOCKET_FILE)
@@ -89,7 +91,7 @@ class TestE32ControlSocket(unittest.TestCase):
         (bytes, address) = self.client_socket.recvfrom(6)
         #self.assertEquals(address, CONTROL_SOCKET_FILE)
         self.assertEqual(len(bytes), 6)
-        self.assertEqual(bytes[0] | 0x03, 0xc3)
+        self.assertEqual(bytes[0], 0xC0)
 
         bytes_orig = bytes
         bytes_new = bytearray(bytes)  # make it mutable
@@ -105,7 +107,7 @@ class TestE32ControlSocket(unittest.TestCase):
         (bytes, address) = self.client_socket.recvfrom(6)
         #self.assertEquals(address, CONTROL_SOCKET_FILE)
         self.assertEqual(len(bytes), 6)
-        self.assertEqual(bytes[0] | 0x03, 0xc3)
+        self.assertEqual(bytes[0], 0xC0)
         self.assertEqual(bytes[1], address_high)
         self.assertEqual(bytes[2], address_low)
 
@@ -114,7 +116,17 @@ class TestE32ControlSocket(unittest.TestCase):
         (bytes, address) = self.client_socket.recvfrom(6)
         #self.assertEquals(address, CONTROL_SOCKET_FILE)
         self.assertEqual(len(bytes), 6)
-        self.assertEqual(bytes[0] | 0x03, 0xc3)
+        self.assertEqual(bytes[0], 0xC0)
+        self.assertEqual(bytes[1], bytes_orig[1])
+        self.assertEqual(bytes[2], bytes_orig[2])
+
+        # change it back to the original without preserving
+        bytes_new[0] = 0xC2
+        self.client_socket.sendto(bytes_new, CONTROL_SOCKET_FILE)
+        (bytes, address) = self.client_socket.recvfrom(6)
+        #self.assertEquals(address, CONTROL_SOCKET_FILE)
+        self.assertEqual(len(bytes), 6)
+        self.assertEqual(bytes[0], 0xC2)
         self.assertEqual(bytes[1], bytes_orig[1])
         self.assertEqual(bytes[2], bytes_orig[2])
 
