@@ -31,6 +31,7 @@ usage(char *progname)
 -x --sock-unix-data FILE Send and receive data from a Unix Domain Socket\n\
 -c --sock-unix-ctrl FILE Change and Read settings from a Unix Domain Socket\n\
 -d --daemon              Run as a Daemon\n\
+-p --pseudo-terminal     Open a pseudo-terminal to run commands against\n\
 ", opts.gpio_m0, opts.gpio_m1, opts.gpio_aux);
 }
 
@@ -69,7 +70,9 @@ options_init(struct options *opts)
   opts->output_file = NULL;
   opts->fd_socket_unix_data = -1;
   opts->fd_socket_unix_control = -1;
+  opts->fd_pty_master = -1;
   opts->aux_transition_additional_delay = 0;
+  opts->pty = 0;
   memset(opts->settings_write_input, 0, sizeof(opts->settings_write_input));
   snprintf(opts->tty_name, 64, "/dev/serial0");
 }
@@ -82,6 +85,7 @@ options_print(struct options* opts)
   printf("option verbose is %d\n", opts->verbose);
   printf("option status is %d\n", opts->status);
   printf("option mode is %d\n", opts->mode);
+  printf("option pty is %d\n", opts->pty);
   printf("option GPIO M0 Pin is %d\n", opts->gpio_m0);
   printf("option GPIO M1 Pin is %d\n", opts->gpio_m1);
   printf("option GPIO AUX Pin is %d\n", opts->gpio_aux);
@@ -89,6 +93,7 @@ options_print(struct options* opts)
   printf("option TTY Name is %s\n", opts->tty_name);
   printf("option socket unix data file desciptor %d\n", opts->fd_socket_unix_data);
   printf("option socket unix control file desciptor %d\n", opts->fd_socket_unix_control);
+  printf("option pseudo-terminal file desciptor %d\n", opts->fd_pty_master);
 
   if(opts->settings_write_input[0])
   {
@@ -210,6 +215,7 @@ options_parse(struct options *opts, int argc, char *argv[])
     {"verbose",                  no_argument, 0, 'v'},
     {"status",                   no_argument, 0, 's'},
     {"tty",                required_argument, 0, 'y'},
+    {"pseudo-terminal",          no_argument, 0, 'p'},
     {"mode",               required_argument, 0, 'm'},
     {"write-settings",     required_argument, 0, 'w'},
     {"m0",                 required_argument, 0,   0},
@@ -227,7 +233,7 @@ options_parse(struct options *opts, int argc, char *argv[])
   while(1)
   {
     option_index = 0;
-    c = getopt_long(argc, argv, "hrtvsy:m:bdx:w:c:", long_options, &option_index);
+    c = getopt_long(argc, argv, "hrtvsy:m:bdx:w:c:p", long_options, &option_index);
 
     if(c == -1)
       break;
@@ -253,6 +259,8 @@ options_parse(struct options *opts, int argc, char *argv[])
         err |= socket_unix_bind(optarg, &opts->fd_socket_unix_data, &opts->socket_unix_data);
       else if(strcmp("sock-unix-ctrl", long_options[option_index].name) == 0)
         err |= socket_unix_bind(optarg, &opts->fd_socket_unix_control, &opts->socket_unix_control);
+      else if(strcmp("pseudo-terminal", long_options[option_index].name) == 0)
+        err |= pty_create(&opts->fd_pty_master);
       break;
     case 'h':
       opts->help = 1;
@@ -291,6 +299,9 @@ options_parse(struct options *opts, int argc, char *argv[])
     case 'w':
       err |= options_parse_settings(opts, optarg);
       break;
+    case 'p':
+      err |= pty_create(&opts->fd_pty_master);
+      break;
     }
   }
 
@@ -321,6 +332,11 @@ options_parse(struct options *opts, int argc, char *argv[])
 
   if(opts->output_file != NULL)
     opts->output_standard = 0;
+
+  if(opts->fd_pty_master > 0)
+  {
+    opts->pty = 1;
+  }
 
   if (optind < argc)
   {

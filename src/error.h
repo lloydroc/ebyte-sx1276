@@ -30,4 +30,10 @@ err_output(const char *format, ...);
 void
 errno_output(const char *format, ...);
 
+void
+err_exit(const char *format, ...);
+
+void
+errno_exit(const char *format, ...);
+
 #endif

@@ -17,7 +17,7 @@
  bytes to it and then wait for AUX to go high, then write another 512 bytes
  you will overwrite most of the 512 bytes. Perhaps the first 64
  bytes would get transmitted then the rest would be overwritten. However,
- this seems to happen on the event the buffer is empty originally. Ff you
+ this seems to happen on the event the buffer is empty originally. If you
  send 512 continuously the first 512 are dropped but the remaining would be
  sent. This is a potential improvement but needs more consideration. The poor
  documentation of the datasheet and how AUX is implemented makes figuring this
@@ -27,7 +27,7 @@
  The 58 bytes comes from the datasheet for the TX Buffer length:
  "Maximum capacity of single package, automatic sub-packing after exceeding"
 */
-#define E32_MAX_PACKET_LENGTH 58
+#define E32_MAX_PACKET_LENGTH 512
 
 #define TX_BUF_BYTES 512
 #define RX_BUF_BYTES 512

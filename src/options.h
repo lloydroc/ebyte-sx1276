@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include "error.h"
 #include "socket.h"
+#include "pty.h"
 
 struct options
 {
@@ -29,12 +30,13 @@ struct options
   int daemon;
   int input_standard;
   int output_standard;
+  int pty;
   int aux_transition_additional_delay;
   char tty_name[64];
   uint8_t settings_write_input[6];
   FILE* input_file;
   FILE* output_file;
-  int fd_socket_unix_data, fd_socket_unix_control;
+  int fd_socket_unix_data, fd_socket_unix_control, fd_pty_master;
   struct sockaddr_un socket_unix_data, socket_unix_control;
 };
 

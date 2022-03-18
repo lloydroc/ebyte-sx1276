@@ -10,6 +10,7 @@ uint8_t rxbuf[RX_BUF_BYTES];
 #define PFD_SOCKET_UNIX_DATA 3
 #define PFD_GPIO_AUX 4
 #define PFD_SOCKET_UNIX_CONTROL 5
+#define PFD_PSEUDO_TERMINAL 6
 
 static int
 e32_init_gpio(struct options *opts, struct E32 *dev)
@@ -735,6 +736,14 @@ e32_write_output(struct E32 *dev, struct options *opts, uint8_t* buf, const size
     fflush(stdout);
   }
 
+  if(opts->pty)
+  {
+    debug_output("e32_write_output: sending %d bytes to pty\n", bytes);
+    outbytes = write(opts->fd_pty_master, buf, bytes);
+    if(outbytes != bytes)
+      errno_output("e32_write_output: error writing output to pseudo terminal.\n");
+  }
+
   return ret;
 }
 
@@ -767,6 +776,12 @@ e32_poll_input_enable(struct options *opts, struct pollfd pfd[])
     pfd[PFD_SOCKET_UNIX_CONTROL].fd = opts->fd_socket_unix_control;
     pfd[PFD_SOCKET_UNIX_CONTROL].events = POLLIN;
   }
+
+  if(opts->pty)
+  {
+    pfd[PFD_PSEUDO_TERMINAL].fd = opts->fd_pty_master;
+    pfd[PFD_PSEUDO_TERMINAL].events = POLLIN;
+  }
 }
 
 static void
@@ -797,6 +812,12 @@ e32_poll_input_disable(struct options *opts, struct pollfd pfd[])
   {
     pfd[PFD_SOCKET_UNIX_CONTROL].fd = -1;
     pfd[PFD_SOCKET_UNIX_CONTROL].events = 0;
+  }
+
+  if(opts->pty)
+  {
+    pfd[PFD_PSEUDO_TERMINAL].fd = -1;
+    pfd[PFD_PSEUDO_TERMINAL].events = 0;
   }
 }
 
@@ -839,6 +860,10 @@ e32_poll_init(struct E32 *dev, struct options *opts, struct pollfd pfd[])
   // used for a unix domain socket control
   pfd[PFD_SOCKET_UNIX_CONTROL].fd = -1;
   pfd[PFD_SOCKET_UNIX_CONTROL].events = 0;
+
+  // used for a pseudo-terminal
+  pfd[PFD_PSEUDO_TERMINAL].fd = -1;
+  pfd[PFD_PSEUDO_TERMINAL].events = 0;
 
   e32_poll_input_enable(opts, pfd);
 
@@ -885,8 +910,8 @@ e32_poll_uart(struct E32 *dev, struct options *opts, int fd_uart, ssize_t *rx_bu
     return 1;
   }
 
-  /* some Raspberry Pi Models will buffer > 1 byte at a time which is ideal
-   * the implication here is after the AUX pin transitions when reading bytes
+  /* Some Raspberry Pi Models will buffer > 1 byte at a time which is ideal.
+   * The implication here is after the AUX pin transitions when reading bytes
    * we will leave bytes in the buffer. If we detect this we'll set an additional
    * delay where after the AUX pin transitions we will delay before reading the
    * additional bytes.
@@ -966,7 +991,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, i
   }
 
   // sending 0 bytes will register and we'll add to the client list
-  if(bytes == 0 && list_index_of(dev->socket_list, &client) == -1)
+  if(list_index_of(dev->socket_list, &client) == -1)
   {
     struct sockaddr_un *new_client;
     new_client = malloc(sizeof(struct sockaddr_un));
@@ -978,7 +1003,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, i
   }
 
   // send back an acknowledge of 1 byte to the client
-  if(bytes == 0)
+  /*if(bytes == 0)
   {
     bytes = sendto(fd_sockd, &client_err, 1, 0, (struct sockaddr*) &client, addrlen);
     if(bytes == -1)
@@ -987,7 +1012,7 @@ e32_poll_socket_unix_data(struct E32 *dev, struct options *opts, int fd_sockd, i
       return 1;
     }
     return 0;
-  }
+  }*/
 
   if(!client_err && e32_transmit(dev, txbuf, bytes))
   {
@@ -1202,19 +1227,41 @@ e32_poll_gpio_aux(struct E32 *dev, struct options *opts, struct pollfd pfd[], ss
   return 0;
 }
 
+static int
+e32_poll_pty(struct E32 *dev, int fd_pty, int *loop_continue)
+{
+  ssize_t bytes;
+
+  bytes = read(fd_pty, &txbuf, E32_MAX_PACKET_LENGTH);
+  if(bytes == -1)
+  {
+    errno_output("error reading from pseudo-terminal\n");
+    return 1;
+  }
+
+  if(dev->verbose)
+    debug_output("e32_poll_pty: got %d bytes as input, writing to uart\n", bytes);
+
+  if(e32_transmit(dev, txbuf, bytes))
+    return 3;
+
+  return 0;
+}
+
 /*
 Input Sources
  - stdin with or without pipe
  - unix domain socket data
  - unix domain socket control
  - file
-
+ - pseudo-terminal
 
 Output Sources
  - stdout
  - file
  - unix domain socket data
  - unix domain socket control
+ - pseudo-terminal
 
 State Machine
  - IDLE -> When AUX=0
@@ -1226,7 +1273,6 @@ State Machine
  we go into the TX state. In both the TX and RX state we don't go back into IDLE unless AUX
  transitions back to high.
 
-
 */
 size_t
 e32_poll(struct E32 *dev, struct options *opts)
@@ -1236,7 +1282,7 @@ e32_poll(struct E32 *dev, struct options *opts)
   size_t errors;
 
   /* used in our poll loop */
-  struct pollfd pfd[6];
+  struct pollfd pfd[7];
 
   e32_poll_init(dev, opts, pfd);
 
@@ -1247,7 +1293,7 @@ e32_poll(struct E32 *dev, struct options *opts)
 
   while(loop)
   {
-    ret = poll(pfd, 6, -1);
+    ret = poll(pfd, 7, -1);
     if(ret == 0)
     {
       err_output("poll timed out\n");
@@ -1286,9 +1332,14 @@ e32_poll(struct E32 *dev, struct options *opts)
       errors += e32_poll_socket_unix_data(dev, opts, pfd[PFD_SOCKET_UNIX_DATA].fd, &loop);
     }
 
-    if( pfd[PFD_SOCKET_UNIX_CONTROL].revents & POLLIN)
+    if(pfd[PFD_SOCKET_UNIX_CONTROL].revents & POLLIN)
     {
       errors += e32_poll_socket_unix_control(dev, opts, pfd[PFD_SOCKET_UNIX_CONTROL].fd);
+    }
+
+    if(pfd[PFD_PSEUDO_TERMINAL].revents & POLLIN)
+    {
+      errors += e32_poll_pty(dev, pfd[PFD_PSEUDO_TERMINAL].fd, &loop);
     }
 
     /*
