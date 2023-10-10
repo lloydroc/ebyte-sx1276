@@ -58,6 +58,8 @@ struct E32
   uint8_t version[4];
   uint8_t settings[6];
   int frequency_mhz;
+  int frequency_min_mhz;
+  int frequency_max_mhz;
   int ver;
   int features;
   int power_down_save;
@@ -72,7 +74,7 @@ struct E32
   int io_drive;
   int wireless_wakeup_time;
   int fec;
-  int tx_power_dbm;
+  int tx_power_attn_dbm;
   struct List *socket_list;
 };
 
