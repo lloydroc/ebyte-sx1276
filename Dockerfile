@@ -1,6 +1,6 @@
 FROM ubuntu:20.04 AS build
 
-ARG VERSION=1.10.0
+ARG VERSION=1.10.1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \

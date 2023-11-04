@@ -433,23 +433,23 @@ e32_cmd_read_settings(struct E32 *dev)
   dev->fec = dev->settings[5] & 0b00000100;
   dev->fec >>= 2;
 
-  dev->tx_power_dbm = dev->settings[5] & 0b00000011;
-  switch(dev->tx_power_dbm)
+  dev->tx_power_attn_dbm = dev->settings[5] & 0b00000011;
+  switch(dev->tx_power_attn_dbm)
   {
     case 0:
-      dev->tx_power_dbm = 30;
+      dev->tx_power_attn_dbm = 0;
       break;
     case 1:
-      dev->tx_power_dbm = 27;
+      dev->tx_power_attn_dbm = -3;
       break;
     case 2:
-      dev->tx_power_dbm = 24;
+      dev->tx_power_attn_dbm = -6;
       break;
     case 3:
-      dev->tx_power_dbm = 21;
+      dev->tx_power_attn_dbm = -9;
       break;
     default:
-      dev->tx_power_dbm = 0;
+      dev->tx_power_attn_dbm = 0;
   }
 
   usleep(54000);
@@ -493,7 +493,7 @@ e32_print_settings(struct E32 *dev)
   info_output("UART Baud Rate:           %d bps\n", dev->uart_baud);
   info_output("Air Data Rate:            %d bps\n", dev->air_data_rate);
   info_output("Channel:                  %d\n", dev->channel);
-  info_output("Frequency                 %d MHz\n", dev->channel+410);
+  info_output("Frequency                 %d MHz\n", dev->channel+dev->frequency_min_mhz);
 
   if(dev->transmission_mode)
     info_output("Transmission Mode:        Transparent\n");
@@ -512,7 +512,7 @@ e32_print_settings(struct E32 *dev)
   else
     info_output("Forward Error Correction: off\n");
 
-  info_output("TX Power:                 %d dBm\n", dev->tx_power_dbm);
+  info_output("TX Power Attenuation:     %d dBm\n", dev->tx_power_attn_dbm);
 }
 
 int
@@ -557,21 +557,33 @@ e32_cmd_read_version(struct E32 *dev)
   {
     case 0x32:
       dev->frequency_mhz = 433;
+      dev->frequency_min_mhz = 410;
+      dev->frequency_max_mhz = 441;
       break;
     case 0x38:
       dev->frequency_mhz = 470;
+      dev->frequency_min_mhz = 410;
+      dev->frequency_max_mhz = 525;
       break;
     case 0x45:
       dev->frequency_mhz = 868;
+      dev->frequency_min_mhz = 862;
+      dev->frequency_max_mhz = 893;
       break;
     case 0x44:
       dev->frequency_mhz = 915;
+      dev->frequency_min_mhz = 900;
+      dev->frequency_max_mhz = 931;
       break;
     case 0x46:
       dev->frequency_mhz = 170;
+      dev->frequency_min_mhz = 160;
+      dev->frequency_max_mhz = 173;
       break;
     default:
       dev->frequency_mhz = 0;
+      dev->frequency_min_mhz = 0;
+      dev->frequency_max_mhz = 0;
   }
 
   dev->ver = dev->version[2];
@@ -589,7 +601,9 @@ e32_print_version(struct E32 *dev)
   for(int i=0;i<4;i++)
     info_output("%02x", dev->version[i]);
   info_output("\n");
-  info_output("Frequency:                %d MHz\n", dev->frequency_mhz);
+  info_output("Frequency Typ:            %d MHz\n", dev->frequency_mhz);
+  info_output("Frequency Min:            %d MHz\n", dev->frequency_min_mhz);
+  info_output("Frequency Max:            %d MHz\n", dev->frequency_max_mhz);
   info_output("Version:                  %d\n", dev->ver);
   info_output("Features:                 0x%02x\n", dev->features);
 }
